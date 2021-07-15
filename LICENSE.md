@@ -1,4 +1,4 @@
-MIT License
+# MIT License
 
 Copyright (c) 2021 Invicton Labs
 Copyright (c) 2018-2019 Matti Paksula
