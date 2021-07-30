@@ -1,12 +1,12 @@
 locals {
   is_windows                   = dirname("/") == "\\"
-  command_unix                 = chomp(var.command_unix != null ? var.command_unix : (var.command_windows != null ?  var.command_windows : ":"))
+  command_unix                 = chomp(var.command_unix != null ? var.command_unix : (var.command_windows != null ? var.command_windows : ":"))
   command_windows              = chomp(var.command_windows != null ? var.command_windows : (var.command_unix != null ? var.command_unix : "% ':'"))
-  command_when_destroy_unix    = chomp(var.command_when_destroy_unix != null ? var.command_when_destroy_unix : (var.command_when_destroy_windows != null ?  var.command_when_destroy_windows : ":"))
+  command_when_destroy_unix    = chomp(var.command_when_destroy_unix != null ? var.command_when_destroy_unix : (var.command_when_destroy_windows != null ? var.command_when_destroy_windows : ":"))
   command_when_destroy_windows = chomp(var.command_when_destroy_windows != null ? var.command_when_destroy_windows : (var.command_when_destroy_unix != null ? var.command_when_destroy_unix : "% ':'"))
   temporary_dir                = abspath(path.module)
-  triggers                      = try(tostring(var.triggers), jsonencode(var.triggers))
-  output_separator = "__TF_MAGIC_RANDOM_SEP"
+  triggers                     = try(tostring(var.triggers), jsonencode(var.triggers))
+  output_separator             = "__TF_MAGIC_RANDOM_SEP"
   interpreter                  = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/run.ps1"] : ["${abspath(path.module)}/run.sh"]
 }
 
@@ -31,7 +31,7 @@ resource "null_resource" "shell" {
 
   provisioner "local-exec" {
     when        = create
-    command = local.is_windows ? self.triggers.command_windows : self.triggers.command_unix
+    command     = local.is_windows ? self.triggers.command_windows : self.triggers.command_unix
     environment = merge(var.environment, var.sensitive_environment, var.triggerless_environment)
     working_dir = self.triggers.working_dir
     interpreter = concat(local.interpreter, [
@@ -58,28 +58,28 @@ locals {
 
 data "local_file" "stdout" {
   depends_on = [null_resource.shell]
-  filename = fileexists(local.stdout_file) ? local.stdout_file : "${path.module}/empty"
+  filename   = fileexists(local.stdout_file) ? local.stdout_file : "${path.module}/empty"
 }
 data "local_file" "stderr" {
   depends_on = [null_resource.shell]
-  filename = fileexists(local.stdout_file) ? local.stderr_file : "${path.module}/empty"
+  filename   = fileexists(local.stdout_file) ? local.stderr_file : "${path.module}/empty"
 }
 data "local_file" "exitstatus" {
   depends_on = [null_resource.shell]
-  filename = fileexists(local.stdout_file) ? local.exitstatus_file : "${path.module}/empty"
+  filename   = fileexists(local.stdout_file) ? local.exitstatus_file : "${path.module}/empty"
 }
 
 // Use this as a resourced-based method to take an input that might change when the output files are missing,
 // but the triggers haven't changed, and maintain the same output.
 resource "random_id" "outputs" {
   // Reload the data when any of the main triggers change
-  keepers = null_resource.shell.triggers
+  keepers     = null_resource.shell.triggers
   byte_length = 8
   // Feed the output values in as prefix. Then we can extract them from the output of this resource,
   // which will only change when the input triggers change
   prefix = "${jsonencode({
-    stdout = chomp(data.local_file.stdout.content)
-    stderr = chomp(data.local_file.stderr.content)
+    stdout     = chomp(data.local_file.stdout.content)
+    stderr     = chomp(data.local_file.stderr.content)
     exitstatus = chomp(data.local_file.exitstatus.content)
   })}${local.output_separator}"
   // Changes to the prefix shouldn't trigger a recreate, because when run again somewhere where the
