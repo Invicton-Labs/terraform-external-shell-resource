@@ -22,7 +22,7 @@ variable "command_when_destroy_windows" {
 
 variable "triggers" {
   description = "A value (of any type) that, when changed, will cause the script to be re-run (will first run the destroy command if this module already exists in the state)."
-  type = any
+  type        = any
   default     = ""
 }
 
@@ -53,5 +53,5 @@ variable "working_dir" {
 variable "fail_on_error" {
   type        = bool
   default     = false
-  description = "Whether a Terraform error should be thrown if the command throws an error. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the error code will be returned in `exitcode`. Default: `false`."
+  description = "Whether a Terraform error should be thrown if the command throws an error. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the error code will be returned in `exitstatus`. Default: `false`."
 }
