@@ -24,6 +24,7 @@ $ErrorActionPreference = "Stop"
 if (( "$_failonerr" -eq "true" ) -and $_exitcode) {
     # If it should fail on an error, and it did fail, read the stderr file
     # Exit with the error message and code
-    Write-Error [IO.File]::ReadAllText("$_stderrfile")
+    $_stderr = [System.IO.File]::ReadAllText("$_stderrfile")
+    Write-Error "$_stderr"
     exit $_exitcode
 }
