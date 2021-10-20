@@ -55,3 +55,9 @@ variable "fail_on_error" {
   default     = false
   description = "Whether a Terraform error should be thrown if the command throws an error. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the error code will be returned in `exitstatus`. Default: `false`."
 }
+
+variable "track_version" {
+  type        = bool
+  default     = false
+  description = "Whether to track the version number of the shell resource. If `true`, this module will output an auto-incrementing number that increases by 1 every time the shell command is re-run."
+}

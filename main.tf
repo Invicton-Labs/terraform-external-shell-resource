@@ -5,16 +5,9 @@ locals {
   command_when_destroy_unix    = chomp(var.command_when_destroy_unix != null ? var.command_when_destroy_unix : (var.command_when_destroy_windows != null ? var.command_when_destroy_windows : ":"))
   command_when_destroy_windows = chomp(var.command_when_destroy_windows != null ? var.command_when_destroy_windows : (var.command_when_destroy_unix != null ? var.command_when_destroy_unix : "% ':'"))
   temporary_dir                = abspath(path.module)
-  triggers                     = try(tostring(var.triggers), jsonencode(var.triggers))
-  output_separator             = "__TF_MAGIC_RANDOM_SEP"
-  interpreter                  = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/run.ps1"] : ["${abspath(path.module)}/run.sh"]
-}
-
-resource "random_uuid" "uuid" {}
-
-resource "null_resource" "shell" {
-  triggers = {
-    triggers                     = local.triggers
+  input_triggers               = try(tostring(var.triggers), jsonencode(var.triggers))
+  all_triggers = {
+    triggers                     = local.input_triggers
     command_unix                 = local.command_unix
     command_windows              = local.command_windows
     command_when_destroy_unix    = local.command_when_destroy_unix
@@ -28,6 +21,23 @@ resource "null_resource" "shell" {
     stderr_file                  = "stderr.${random_uuid.uuid.result}"
     exitstatus_file              = "exitstatus.${random_uuid.uuid.result}"
   }
+  output_separator = "__TF_MAGIC_RANDOM_SEP"
+  interpreter      = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/run.ps1"] : ["${abspath(path.module)}/run.sh"]
+}
+
+module "state_keeper" {
+  source              = "Invicton-Labs/state-keeper/null"
+  version             = "~> 0.1.1"
+  count               = var.track_version ? 1 : 0
+  read_existing_value = true
+  input               = module.state_keeper[0].existing_value == null ? 0 : module.state_keeper[0].existing_value + 1
+  triggers            = local.all_triggers
+}
+
+resource "random_uuid" "uuid" {}
+
+resource "null_resource" "shell" {
+  triggers = local.all_triggers
 
   provisioner "local-exec" {
     when        = create
