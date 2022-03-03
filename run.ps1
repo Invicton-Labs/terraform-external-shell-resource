@@ -1,4 +1,3 @@
-
 # Equivalent of set -e
 $ErrorActionPreference = "Stop"
 
@@ -7,17 +6,26 @@ set-strictmode -version 3.0
 $_path = $args[0]
 $_id = $args[1]
 $_failonerr = $args[2]
-$_cmd = $args[3..($args.length - 1)]
-
+$_cmd = $args[3]
 $_stderrfile = "$_path/stderr.$_id"
 $_stdoutfile = "$_path/stdout.$_id"
 $_exitcodefile = "$_path/exitstatus.$_id"
+$_cmdfile = "$_path/cmd.$_id.ps1"
+
+# Write the command to a file to execute from
+# First start with a command that causes the script to exit if an error is thrown
+Write-Output '$ErrorActionPreference = "Stop"' | Out-File -FilePath "$_cmdfile"
+# Now write the command itself 
+Write-Output "$_cmd" | Out-File -Append -FilePath "$_cmdfile"
 
 # Equivalent of set +e
 $ErrorActionPreference = "Continue"
-$_process = Start-Process powershell.exe -ArgumentList "$_cmd" -Wait -PassThru -NoNewWindow -RedirectStandardError "$_stderrfile" -RedirectStandardOutput "$_stdoutfile"
+$_process = Start-Process powershell.exe -ArgumentList "-file ""$_cmdfile""" -Wait -PassThru -NoNewWindow -RedirectStandardError "$_stderrfile" -RedirectStandardOutput "$_stdoutfile"
 $_exitcode = $_process.ExitCode
 $ErrorActionPreference = "Stop"
+
+# Delete the command file
+Remove-Item "$_cmdfile"
 
 [System.IO.File]::WriteAllText("$_exitcodefile", "$_exitcode", [System.Text.Encoding]::ASCII)
 

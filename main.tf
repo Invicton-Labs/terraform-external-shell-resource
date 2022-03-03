@@ -9,9 +9,9 @@ locals {
   all_triggers = {
     triggers                     = local.input_triggers
     command_unix                 = local.command_unix
-    command_windows              = local.command_windows
+    command_windows              = "\"${module.escaped_powershell_commands["command_windows"].escaped}\""
     command_when_destroy_unix    = local.command_when_destroy_unix
-    command_when_destroy_windows = local.command_when_destroy_windows
+    command_when_destroy_windows = "\"${module.escaped_powershell_commands["command_when_destroy_windows"].escaped}\""
     environment                  = jsonencode(var.environment)
     sensitive_environment        = sensitive(jsonencode(var.sensitive_environment))
     working_dir                  = var.working_dir
@@ -23,6 +23,16 @@ locals {
   }
   output_separator = "__TF_MAGIC_RANDOM_SEP"
   interpreter      = local.is_windows ? ["powershell.exe", "${abspath(path.module)}/run.ps1"] : ["${abspath(path.module)}/run.sh"]
+}
+
+module "escaped_powershell_commands" {
+  source  = "Invicton-Labs/escape-powershell-string/null"
+  version = "~>0.1.0"
+  for_each = {
+    command_windows              = local.command_windows
+    command_when_destroy_windows = local.command_when_destroy_windows
+  }
+  string = each.value
 }
 
 module "state_keeper" {
