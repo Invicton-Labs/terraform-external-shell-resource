@@ -1,5 +1,5 @@
-#!/bin/bash
-set -eu
+#!/usr/bin/env bash
+set -euo pipefail
 
 _temp_dir=$(echo "$1" | base64 --decode); shift
 _id=$(echo "$1" | base64 --decode); shift

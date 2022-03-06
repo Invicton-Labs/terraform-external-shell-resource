@@ -31,3 +31,5 @@ override.tf.json
 # Ignore temporary output files
 /tmpfiles/*
 !/tmpfiles/.gitkeep
+
+.terraform.lock.hcl
