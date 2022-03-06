@@ -23,6 +23,7 @@ fi
 
 # Write the command to a file to execute from
 echo "$_command" > "$_cmdfile"
+
 # Always force the command file to exit with the last exit code
 echo 'exit $?' >> "$_cmdfile"
 

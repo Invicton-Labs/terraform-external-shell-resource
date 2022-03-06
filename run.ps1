@@ -24,11 +24,11 @@ else {
     $_cmdfile = "$_temp_dir/cmd.$_id.create.ps1"
 }
 
-# Write the command to a file to execute from
-Write-Output "$_command" | Out-File -FilePath "$_cmdfile"
+# Write the command to a file
+[System.IO.File]::WriteAllText("$_cmdfile", "$_command")
 
 # Always force the command file to exit with the last exit code
-Write-Output 'Exit $LASTEXITCODE' | Out-File -Append -FilePath "$_cmdfile"
+[System.IO.File]::AppendAllText("$_cmdfile", "`n`nExit `$LASTEXITCODE")
 
 # Equivalent of set +e
 $ErrorActionPreference = "Continue"
@@ -72,5 +72,5 @@ if ( "$_is_delete" -eq "true" ) {
 }
 else {
     # Store the exit code in a file
-    [System.IO.File]::WriteAllText("$_exitcodefile", "$_exitcode", [System.Text.Encoding]::ASCII)
+    [System.IO.File]::WriteAllText("$_exitcodefile", "$_exitcode")
 }
