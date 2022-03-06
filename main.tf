@@ -7,9 +7,9 @@ locals {
   null_command_unix    = ":"
   null_command_windows = "% ':'"
 
-  command_unix                 = chomp(var.command_unix != null ? var.command_unix : (var.command_windows != null ? var.command_windows : local.null_command_unix))
+  command_unix                 = replace(replace(chomp(var.command_unix != null ? var.command_unix : (var.command_windows != null ? var.command_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
   command_windows              = chomp(var.command_windows != null ? var.command_windows : (var.command_unix != null ? var.command_unix : local.null_command_windows))
-  command_when_destroy_unix    = chomp(var.command_when_destroy_unix != null ? var.command_when_destroy_unix : (var.command_when_destroy_windows != null ? var.command_when_destroy_windows : local.null_command_unix))
+  command_when_destroy_unix    = replace(replace(chomp(var.command_when_destroy_unix != null ? var.command_when_destroy_unix : (var.command_when_destroy_windows != null ? var.command_when_destroy_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
   command_when_destroy_windows = chomp(var.command_when_destroy_windows != null ? var.command_when_destroy_windows : (var.command_when_destroy_unix != null ? var.command_when_destroy_unix : local.null_command_windows))
 
   // The input trigger can be a simple string or a JSON-encoded object
@@ -18,7 +18,7 @@ locals {
   // These are all of the things that, if they change, trigger a re-create
   all_triggers = {
     // If the triggers change, that obviously triggers a re-create
-    triggers                     = local.input_triggers
+    triggers = local.input_triggers
     // If any of the commands change
     command_unix                 = local.command_unix
     command_windows              = local.command_windows
@@ -26,24 +26,24 @@ locals {
     command_when_destroy_windows = local.command_when_destroy_windows
 
     // If the environment variables change
-    environment                  = jsonencode(var.environment)
-    sensitive_environment        = sensitive(jsonencode(var.sensitive_environment))
+    environment           = jsonencode(var.environment)
+    sensitive_environment = sensitive(jsonencode(var.sensitive_environment))
 
     // If the working directory changes
-    working_dir                  = var.working_dir
+    working_dir = var.working_dir
 
 
     // If we want to handle errors differently, that needs a re-create
-    fail_on_nonzero_exit_code    = var.fail_on_nonzero_exit_code
-    fail_on_stderr               = var.fail_on_stderr
+    fail_on_nonzero_exit_code = var.fail_on_nonzero_exit_code
+    fail_on_stderr            = var.fail_on_stderr
 
     // These should never change unless the module itself is destroyed/tainted, but we need
     // them in the trigger so that they can be referenced with the "self" variable
     // in the provisioners
-    uuid                         = random_uuid.uuid.result
-    stdout_file                  = "stdout.${random_uuid.uuid.result}"
-    stderr_file                  = "stderr.${random_uuid.uuid.result}"
-    exit_code_file               = "exitcode.${random_uuid.uuid.result}"
+    uuid           = random_uuid.uuid.result
+    stdout_file    = "stdout.${random_uuid.uuid.result}"
+    stderr_file    = "stderr.${random_uuid.uuid.result}"
+    exit_code_file = "exitcode.${random_uuid.uuid.result}"
   }
 
   // We use <> in the separator because we know jsonencode replaces these characters,
