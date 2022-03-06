@@ -1,5 +1,7 @@
 # Terraform Shell (Resource)
 
+On the Terraform Registry: [Invicton-Labs/shell-resource/external](https://registry.terraform.io/modules/Invicton-Labs/shell-resource/external/latest)
+
 This module allows generic shell commands to be run as a resource (will only re-run when an input variable changes). It supports both Linux and Windows (Mac currently untested, but *should* be supported) and requires no external dependencies. This is a complete rewrite of the [original module from Matti Paksula](https://github.com/matti/terraform-shell-resource); it offers many new features and fixes one of the major issues with the old module, which was that the outputs would not be updated on a trigger change.
 
 This module is a workaround for https://github.com/hashicorp/terraform/issues/610, please give it a 👍 so we don't need this module anymore.
