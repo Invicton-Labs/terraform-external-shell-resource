@@ -50,10 +50,16 @@ variable "working_dir" {
   description = "The working directory where command will be executed."
 }
 
-variable "fail_on_error" {
+variable "fail_on_nonzero_exit_code" {
+  type        = bool
+  default     = true
+  description = "Whether a Terraform error should be thrown if the command exits with a non-zero exit code. If true, nothing will be returned from this module and Terraform will fail the plan/apply. If false, the error message will be returned in `stderr` and the error code will be returned in `exit_code`."
+}
+
+variable "fail_on_stderr" {
   type        = bool
   default     = false
-  description = "Whether a Terraform error should be thrown if the command throws an error. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the error code will be returned in `exitstatus`. Default: `false`."
+  description = "Whether a Terraform error should be thrown if the command outputs anything to stderr. If true, nothing will be returned from this module and Terraform will fail the plan/apply. If false, the error message will be returned in `stderr` and the exit code will be returned in `exit_code`."
 }
 
 variable "track_version" {

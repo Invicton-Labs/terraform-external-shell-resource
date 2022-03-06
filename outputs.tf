@@ -13,9 +13,9 @@ output "stderr" {
   value       = local.outputs.stderr
 }
 
-output "exitstatus" {
+output "exit_code" {
   description = "The exit status code of the shell command."
-  value       = tonumber(local.outputs.exitstatus)
+  value       = tonumber(local.outputs.exit_code)
 }
 
 output "version" {

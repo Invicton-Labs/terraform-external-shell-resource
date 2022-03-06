@@ -1,8 +1,10 @@
 # Terraform Shell (Resource)
 
-This module allows generic shell commands to be run as a resource (will only re-run when an input variable changes). It supports both Linux and Windows (Mac currently untested, but *should* be supported) and requires no external dependencies. This is an updated and heavily revised version of the [original module from Matti Paksula](https://github.com/matti/terraform-shell-resource) that cleans up the code by using modern Terraform functions and fixes one of the major issues with the old module, which was that the outputs would not be updated on a trigger change.
+This module allows generic shell commands to be run as a resource (will only re-run when an input variable changes). It supports both Linux and Windows (Mac currently untested, but *should* be supported) and requires no external dependencies. This is a complete rewrite of the [original module from Matti Paksula](https://github.com/matti/terraform-shell-resource); it offers many new features and fixes one of the major issues with the old module, which was that the outputs would not be updated on a trigger change.
 
-This module is a workaround for https://github.com/hashicorp/terraform/issues/610, please give it a 👍 so we don't need this workaround anymore.
+This module is a workaround for https://github.com/hashicorp/terraform/issues/610, please give it a 👍 so we don't need this module anymore.
+
+For Windows, this module should work on any system that supports a relatively modern version of PowerShell. For Unix, this module should work on any system that supports `sed` and `base64` (which is the vast majority of out-of-the-box systems).
 
 For a module that has the same functionality but runs as a data source instead (re-runs every plan/apply), see [this module](https://registry.terraform.io/modules/Invicton-Labs/shell-data/external/latest).
 
@@ -13,6 +15,8 @@ For a module that has the same functionality but runs as a data source instead (
 - Whatever your heart desires
 
 ## Usage
+
+**Note:** if only one of `command_unix` or `command_windows` is provided, that one will be used on all operating systems. The same applies for `command_when_destroy_unix` and `command_when_destroy_windows`.
 
 ```
 module "shell_resource_hello" {
@@ -33,10 +37,15 @@ module "shell_resource_hello" {
   // The directory to run the command in
   working_dir     = path.root
 
-  // Whether Terraform should exit with an error message if the command returns a non-zero exit status
-  fail_on_error   = true
+  // If the command exits with a non-zero exit code, kill Terraform.
+  // This is enabled by default because generally we want our commands to succeed.
+  fail_on_nonzero_exit_code = true
 
-  // Environment variables (will appear in plain text in the Terraform plan output)
+  // We can optionally also kill Terraform if the command writes anything to stderr.
+  // This is disabled by default because many commands write to stderr even if nothing went wrong.
+  fail_on_stderr = false
+
+  // Environment variables (will appear in base64-encoded form in the Terraform plan output)
   environment = {
     TEXT     = "Hello"
     DESTROY_TEXT = "Goodbye"
@@ -60,7 +69,7 @@ output "stderr" {
   value = module.shell_resource_hello.stderr
 }
 output "exitstatus" {
-  value = module.shell_resource_hello.exitstatus
+  value = module.shell_resource_hello.exit_code
 }
 ```
 
@@ -72,18 +81,8 @@ Outputs:
 
 exitstatus = 0
 stderr = ""
-stdout = "Hello World from 2021-07-11T18:58:05Z"
+stdout = "Hello World from 2022-03-06T06:22:14Z"
 ```
-
-## Breaking changes from Matti's version:
-- `command` input variable renamed to `command_unix` for specificity
-- `trigger` input variable renamed to `triggers` to match Terraform convention and to better represent the fact that a map of triggers is now accepted
-- Changes to the `trigger` input variable will now result in a changed output
-- `depends` input variable removed, as modules in modern Terraform versions now support `depends_on` natively
-
-## Non-breaking changes from Matti's version:
-- Temporary output files are now immediately deleted after reading them, to keep them from lingering around.
-- The `trigger` input variable can now be any type, not just a string
 
 ## Related issues:
  - https://github.com/hashicorp/terraform/issues/610
