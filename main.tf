@@ -9,8 +9,8 @@ locals {
 
   command_unix                 = replace(replace(chomp(var.command_unix != null ? var.command_unix : (var.command_windows != null ? var.command_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
   command_windows              = chomp(var.command_windows != null ? var.command_windows : (var.command_unix != null ? var.command_unix : local.null_command_windows))
-  command_when_destroy_unix    = replace(replace(chomp(var.command_when_destroy_unix != null ? var.command_when_destroy_unix : (var.command_when_destroy_windows != null ? var.command_when_destroy_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
-  command_when_destroy_windows = chomp(var.command_when_destroy_windows != null ? var.command_when_destroy_windows : (var.command_when_destroy_unix != null ? var.command_when_destroy_unix : local.null_command_windows))
+  command_destroy_unix    = replace(replace(chomp(var.command_destroy_unix != null ? var.command_destroy_unix : (var.command_destroy_windows != null ? var.command_destroy_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
+  command_destroy_windows = chomp(var.command_destroy_windows != null ? var.command_destroy_windows : (var.command_destroy_unix != null ? var.command_destroy_unix : local.null_command_windows))
 
   // The input trigger can be a simple string or a JSON-encoded object
   input_triggers = try(tostring(var.triggers), jsonencode(var.triggers))
@@ -22,8 +22,8 @@ locals {
     // If any of the commands change
     command_unix                 = local.command_unix
     command_windows              = local.command_windows
-    command_when_destroy_unix    = local.command_when_destroy_unix
-    command_when_destroy_windows = local.command_when_destroy_windows
+    command_destroy_unix    = local.command_destroy_unix
+    command_destroy_windows = local.command_destroy_windows
 
     // If the environment variables change
     // We jsonencode because the `triggers`/`keepers` expect a map of string
@@ -126,7 +126,7 @@ resource "null_resource" "shell" {
       self.triggers.fail_destroy_on_nonzero_exit_code ? 1 : 0,
       self.triggers.fail_destroy_on_stderr ? 1 : 0,
       self.triggers.fail_destroy_on_timeout ? 1 : 0,
-      base64encode(dirname("/") == "\\" ? self.triggers.command_when_destroy_windows : self.triggers.command_when_destroy_unix),
+      base64encode(dirname("/") == "\\" ? self.triggers.command_destroy_windows : self.triggers.command_destroy_unix),
       "${self.triggers.stdout_file}.destroy",
       "${self.triggers.stderr_file}.destroy",
       "${self.triggers.exit_code_file}.destroy",

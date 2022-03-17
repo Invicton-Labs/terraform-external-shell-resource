@@ -10,13 +10,13 @@ variable "command_windows" {
   default     = null
 }
 
-variable "command_when_destroy_unix" {
-  description = "The command to run on destruction when the module is used on a Unix machine. If not specified, will default to be the same as the `command_when_destroy_windows` variable."
+variable "command_destroy_unix" {
+  description = "The command to run on destruction when the module is used on a Unix machine. If not specified, will default to be the same as the `command_destroy_windows` variable."
   default     = null
 }
 
-variable "command_when_destroy_windows" {
-  description = "The command to run on destruction when the module is used on a Windows machine. If not specified, will default to be the same as the `command_when_destroy_unix` variable."
+variable "command_destroy_windows" {
+  description = "The command to run on destruction when the module is used on a Windows machine. If not specified, will default to be the same as the `command_destroy_unix` variable."
   default     = null
 }
 
@@ -65,7 +65,7 @@ variable "fail_create_on_timeout" {
 variable "fail_create_on_stderr" {
   type        = bool
   default     = false
-  description = "Whether a Terraform error should be thrown if the create command outputs anything to stderr. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the exit code will be returned in `exit_code`."
+  description = "Whether a Terraform error should be thrown if the create command outputs anything to stderr. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the exit code will be returned in `exit_code`. This is disabled by default because many commands write to stderr even if nothing went wrong."
 }
 
 variable "fail_destroy_on_nonzero_exit_code" {

@@ -16,9 +16,12 @@ For a module that has the same functionality but runs as a data source instead (
 - Integration of other installed tools such as `openssl`
 - Whatever your heart desires
 
+## Limitations
+- For use on macOS, the `coreutils` package must be installed and `timeout` must be created as an alias for `gtimeout`
+
 ## Usage
 
-**Note:** if only one of `command_unix` or `command_windows` is provided, that one will be used on all operating systems. The same applies for `command_when_destroy_unix` and `command_when_destroy_windows`.
+**Note:** if only one of `command_unix` or `command_windows` is provided, that one will be used on all operating systems. The same applies for `command_destroy_unix` and `command_destroy_windows`.
 
 ```
 module "shell_resource_hello" {
@@ -31,21 +34,34 @@ module "shell_resource_hello" {
   command_windows = "Write-Host \"$env:TEXT $env:MORETEXT from $env:ORIGINAL_CREATED_TIME\""
 
   // The command to run on resource destruction on Unix machines
-  command_when_destroy_unix         = "echo \"$TEXT $MORETEXT\""
+  command_destroy_unix         = "echo \"$TEXT $MORETEXT\""
 
   // The command to run on resource destruction on Windows machines
-  command_when_destroy_windows = "Write-Host \"$env:TEXT $env:MORETEXT\""
+  command_destroy_windows = "Write-Host \"$env:TEXT $env:MORETEXT\""
 
   // The directory to run the command in
   working_dir     = path.root
 
   // If the command exits with a non-zero exit code, kill Terraform.
   // This is enabled by default because generally we want our commands to succeed.
-  fail_on_nonzero_exit_code = true
+  fail_create_on_nonzero_exit_code = true
 
   // We can optionally also kill Terraform if the command writes anything to stderr.
   // This is disabled by default because many commands write to stderr even if nothing went wrong.
-  fail_on_stderr = false
+  fail_create_on_stderr = false
+
+  // The same variables exist for destroy commands
+  fail_destroy_on_nonzero_exit_code = true
+  fail_destroy_on_stderr = false
+
+  // We can optionally set a timeout; if the command runs longer than this, it will be killed
+  // There are separate timeouts for the create and destroy steps
+  timeout_create = 120
+  timeout_destroy = 60
+
+  // By default, the apply will fail on a timeout, but we can optionally override that
+  fail_create_on_timeout = false
+  fail_destroy_on_timeout = false
 
   // Environment variables (will appear in base64-encoded form in the Terraform plan output)
   environment = {
