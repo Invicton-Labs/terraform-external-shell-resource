@@ -162,7 +162,8 @@ resource "random_id" "outputs" {
     // These ternary operators just force Terraform to wait for the shell execution to be complete before trying to read the file contents
     stdout    = fileexists(null_resource.shell.id == null ? local.stdout_file : local.stdout_file) ? file(null_resource.shell.id == null ? local.stdout_file : local.stdout_file) : ""
     stderr    = fileexists(null_resource.shell.id == null ? local.stderr_file : local.stderr_file) ? file(null_resource.shell.id == null ? local.stderr_file : local.stderr_file) : ""
-    exit_code = fileexists(null_resource.shell.id == null ? local.exit_code_file : local.exit_code_file) ? file(null_resource.shell.id == null ? local.exit_code_file : local.exit_code_file) : ""
+    // Replace any CR, LF, or CRLF characters with empty strings. We just want to read the exit code number
+    exit_code = chomp(replace(replace(replace(fileexists(null_resource.shell.id == null ? local.exit_code_file : local.exit_code_file) ? file(null_resource.shell.id == null ? local.exit_code_file : local.exit_code_file) : "", "\r", ""), "\r\n", ""), "\n", ""))
   })}${local.output_separator}")
   // Changes to the prefix shouldn't trigger a recreate, because when run again somewhere where the
   // original output files don't exist (but the shell triggers haven't changed), we don't want to
