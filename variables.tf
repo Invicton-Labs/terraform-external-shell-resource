@@ -50,20 +50,74 @@ variable "working_dir" {
   description = "The working directory where command will be executed."
 }
 
-variable "fail_on_nonzero_exit_code" {
+variable "fail_create_on_nonzero_exit_code" {
   type        = bool
   default     = true
-  description = "Whether a Terraform error should be thrown if the command exits with a non-zero exit code. If true, nothing will be returned from this module and Terraform will fail the plan/apply. If false, the error message will be returned in `stderr` and the error code will be returned in `exit_code`."
+  description = "Whether a Terraform error should be thrown if the create command exits with a non-zero exit code. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the error code will be returned in `exit_code`."
 }
 
-variable "fail_on_stderr" {
+variable "fail_create_on_timeout" {
+  type        = bool
+  default     = true
+  description = "Whether a Terraform error should be thrown if the create command times out (only applies if the `timeout_create` or `timeout_destroy` variable is provided). If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the exit code will be returned in `exit_code`."
+}
+
+variable "fail_create_on_stderr" {
   type        = bool
   default     = false
-  description = "Whether a Terraform error should be thrown if the command outputs anything to stderr. If true, nothing will be returned from this module and Terraform will fail the plan/apply. If false, the error message will be returned in `stderr` and the exit code will be returned in `exit_code`."
+  description = "Whether a Terraform error should be thrown if the create command outputs anything to stderr. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the exit code will be returned in `exit_code`."
+}
+
+variable "fail_destroy_on_nonzero_exit_code" {
+  type        = bool
+  default     = true
+  description = "Whether a Terraform error should be thrown if the destroy command exits with a non-zero exit code. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the error code will be returned in `exit_code`."
+}
+
+variable "fail_destroy_on_timeout" {
+  type        = bool
+  default     = true
+  description = "Whether a Terraform error should be thrown if the destroy command times out (only applies if the `timeout_create` or `timeout_destroy` variable is provided). If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the exit code will be returned in `exit_code`."
+}
+
+variable "fail_destroy_on_stderr" {
+  type        = bool
+  default     = false
+  description = "Whether a Terraform error should be thrown if the destroy command outputs anything to stderr. If true, nothing will be returned from this module and Terraform will fail the apply. If false, the error message will be returned in `stderr` and the exit code will be returned in `exit_code`."
+}
+
+variable "timeout_create" {
+  type = number
+  default = null
+  description = "The maximum number of seconds to allow the shell command to execute for on resource creation. If it exceeds this timeout, it will be killed and will fail. Leave as the default (`null`) for no timeout."
+}
+
+variable "timeout_destroy" {
+  type = number
+  default = null
+  description = "The maximum number of seconds to allow the shell command to execute for on resource destruction. If it exceeds this timeout, it will be killed and will fail. Leave as the default (`null`) for no timeout."
 }
 
 variable "track_version" {
   type        = bool
   default     = false
   description = "Whether to track the version number of the shell resource. If `true`, this module will output an auto-incrementing number that increases by 1 every time the shell command is re-run."
+}
+
+variable "dynamic_depends_on" {
+  type = any
+  default = null
+  description = "Has the same function as the built-in Terraform `depends_on` parameter, except that it can reference dynamic values as well."
+}
+
+variable "debug" {
+  type = bool
+  default = false
+  description = "Whether to output debug content into a special debug file (stored within this module's \"$${path.module}/tmpfiles\" directory) that does not get deleted after completing the apply. Usually only useful for development of this module."
+}
+
+variable "suppress_console" {
+  type = bool
+  default = false
+  description = "Whether to suppress the Terraform console output (including plan content and shell execution status messages) for this module. If enabled, much of the content will be hidden by marking it as \"sensitive\"."
 }

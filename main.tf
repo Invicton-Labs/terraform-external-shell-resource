@@ -26,24 +26,35 @@ locals {
     command_when_destroy_windows = local.command_when_destroy_windows
 
     // If the environment variables change
+    // We jsonencode because the `triggers`/`keepers` expect a map of string
     environment           = jsonencode(var.environment)
-    sensitive_environment = sensitive(jsonencode(var.sensitive_environment))
+    // Only mark it as sensitive if anything is actually sensitive
+    sensitive_environment = length(var.sensitive_environment) > 0 ? sensitive(jsonencode(var.sensitive_environment)) : jsonencode({})
 
     // If the working directory changes
     working_dir = var.working_dir
 
-
     // If we want to handle errors differently, that needs a re-create
-    fail_on_nonzero_exit_code = var.fail_on_nonzero_exit_code
-    fail_on_stderr            = var.fail_on_stderr
+    fail_create_on_nonzero_exit_code = var.fail_create_on_nonzero_exit_code
+    fail_create_on_stderr            = var.fail_create_on_stderr
+    fail_create_on_timeout = var.fail_create_on_timeout
+    fail_destroy_on_nonzero_exit_code = var.fail_destroy_on_nonzero_exit_code
+    fail_destroy_on_stderr            = var.fail_destroy_on_stderr
+    fail_destroy_on_timeout = var.fail_destroy_on_timeout
+
+    // Different timeouts need re-create
+    timeout_create  = var.timeout_create == null ? 0 : (var.timeout_create < 0 ? 0 : var.timeout_create)
+    timeout_destroy = var.timeout_destroy == null ? 0 : (var.timeout_destroy < 0 ? 0 : var.timeout_destroy)
 
     // These should never change unless the module itself is destroyed/tainted, but we need
     // them in the trigger so that they can be referenced with the "self" variable
     // in the provisioners
     uuid           = random_uuid.uuid.result
-    stdout_file    = "stdout.${random_uuid.uuid.result}"
-    stderr_file    = "stderr.${random_uuid.uuid.result}"
-    exit_code_file = "exitcode.${random_uuid.uuid.result}"
+    stdout_file    = "${random_uuid.uuid.result}.stdout"
+    stderr_file    = "${random_uuid.uuid.result}.stderr"
+    exit_code_file = "${random_uuid.uuid.result}.exitcode"
+
+    debug = var.debug
   }
 
   // We use <> in the separator because we know jsonencode replaces these characters,
@@ -60,8 +71,18 @@ module "state_keeper" {
   triggers            = local.all_triggers
 }
 
+module "dynamic_depends_on" {
+  source = "./dynamic-depends-on"
+  dynamic_depends_on = var.dynamic_depends_on
+}
+
 resource "null_resource" "shell" {
-  triggers = sensitive(local.all_triggers)
+  depends_on = [
+    module.dynamic_depends_on
+  ]
+
+  // We mark it as sensitive so it doesn't have a massive output in the Terraform plan
+  triggers = var.suppress_console ? sensitive(local.all_triggers) : local.all_triggers
 
   // This provisioner runs the main command
   provisioner "local-exec" {
@@ -74,14 +95,17 @@ resource "null_resource" "shell" {
       "${abspath(path.module)}/run.sh"
       ], [
       base64encode(abspath("${path.module}/tmpfiles")),
-      base64encode(self.triggers.uuid),
-      base64encode(self.triggers.fail_on_nonzero_exit_code ? "true" : "false"),
-      base64encode(self.triggers.fail_on_stderr ? "true" : "false"),
+      self.triggers.uuid,
+      self.triggers.fail_create_on_nonzero_exit_code ? 1 : 0,
+      self.triggers.fail_create_on_stderr ? 1 : 0,
+      self.triggers.fail_create_on_timeout ? 1 : 0,
       base64encode(dirname("/") == "\\" ? self.triggers.command_windows : self.triggers.command_unix),
-      base64encode(self.triggers.stdout_file),
-      base64encode(self.triggers.stderr_file),
-      base64encode(self.triggers.exit_code_file),
-      base64encode("false"),
+      self.triggers.stdout_file,
+      self.triggers.stderr_file,
+      self.triggers.exit_code_file,
+      self.triggers.timeout_create,
+      0,
+      self.triggers.debug ? 1 : 0,
     ]))
     environment = merge(jsondecode(self.triggers.environment), jsondecode(self.triggers.sensitive_environment), var.triggerless_environment)
     working_dir = self.triggers.working_dir
@@ -98,14 +122,17 @@ resource "null_resource" "shell" {
       "${abspath(path.module)}/run.sh"
       ], [
       base64encode(abspath("${path.module}/tmpfiles")),
-      base64encode(self.triggers.uuid),
-      base64encode(self.triggers.fail_on_nonzero_exit_code ? "true" : "false"),
-      base64encode(self.triggers.fail_on_stderr ? "true" : "false"),
+      self.triggers.uuid,
+      self.triggers.fail_destroy_on_nonzero_exit_code ? 1 : 0,
+      self.triggers.fail_destroy_on_stderr ? 1 : 0,
+      self.triggers.fail_destroy_on_timeout ? 1 : 0,
       base64encode(dirname("/") == "\\" ? self.triggers.command_when_destroy_windows : self.triggers.command_when_destroy_unix),
-      base64encode("delete.${self.triggers.stdout_file}"),
-      base64encode("delete.${self.triggers.stderr_file}"),
-      base64encode("delete.${self.triggers.exit_code_file}"),
-      base64encode("true"),
+      "${self.triggers.stdout_file}.destroy",
+      "${self.triggers.stderr_file}.destroy",
+      "${self.triggers.exit_code_file}.destroy",
+      self.triggers.timeout_destroy,
+      1,
+      self.triggers.debug ? 1 : 0,
     ]))
     environment = merge(jsondecode(self.triggers.environment), jsondecode(self.triggers.sensitive_environment))
     working_dir = self.triggers.working_dir
@@ -119,34 +146,23 @@ locals {
   exit_code_file = abspath("${path.module}/tmpfiles/${null_resource.shell.triggers.exit_code_file}")
 }
 
-// Read the stdout, stderr, and exit code from files
-data "local_file" "stdout" {
-  depends_on = [null_resource.shell]
-  filename   = fileexists(local.stdout_file) ? local.stdout_file : "${path.module}/empty"
-}
-data "local_file" "stderr" {
-  depends_on = [null_resource.shell]
-  filename   = fileexists(local.stderr_file) ? local.stderr_file : "${path.module}/empty"
-}
-data "local_file" "exit_code" {
-  depends_on = [null_resource.shell]
-  filename   = fileexists(local.exit_code_file) ? local.exit_code_file : "${path.module}/empty"
-}
-
 // Use this as a resourced-based method to take an input that might change when the output files are missing,
 // but the triggers haven't changed, and maintain the same output.
 resource "random_id" "outputs" {
   // Reload the data when any of the main triggers change
-  // We mark this as sensitive just so it doesn't have a massive output in the Terraform plan
-  keepers     = sensitive(null_resource.shell.triggers)
+  // We use a hash so it doesn't have a massive output in the Terraform plan
+  keepers     = {
+    trigger_hash = base64sha256(jsonencode(null_resource.shell.triggers))
+  }
   byte_length = 8
   // Feed the output values in as prefix. Then we can extract them from the output of this resource,
   // which will only change when the input triggers change
   // We mark this as sensitive just so it doesn't have a massive output in the Terraform plan
   prefix = sensitive("${jsonencode({
-    stdout    = chomp(data.local_file.stdout.content)
-    stderr    = chomp(data.local_file.stderr.content)
-    exit_code = chomp(data.local_file.exit_code.content)
+    // These ternary operators just force Terraform to wait for the shell execution to be complete before trying to read the file contents
+    stdout    = fileexists(null_resource.shell.id == null ? local.stdout_file : local.stdout_file) ? file(null_resource.shell.id == null ? local.stdout_file : local.stdout_file) : ""
+    stderr    = fileexists(null_resource.shell.id == null ? local.stderr_file : local.stderr_file) ? file(null_resource.shell.id == null ? local.stderr_file : local.stderr_file) : ""
+    exit_code = fileexists(null_resource.shell.id == null ? local.exit_code_file : local.exit_code_file) ? file(null_resource.shell.id == null ? local.exit_code_file : local.exit_code_file) : ""
   })}${local.output_separator}")
   // Changes to the prefix shouldn't trigger a recreate, because when run again somewhere where the
   // original output files don't exist (but the shell triggers haven't changed), we don't want to
@@ -162,21 +178,21 @@ resource "random_id" "outputs" {
   provisioner "local-exec" {
     when        = create
     interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "Remove-Item ${self.keepers.stdout_file}" : "rm ${self.keepers.stdout_file}"
+    command     = dirname("/") == "\\" ? "Remove-Item ${null_resource.shell.triggers.stdout_file}" : "rm ${null_resource.shell.triggers.stdout_file}"
     on_failure  = fail
     working_dir = "${path.module}/tmpfiles"
   }
   provisioner "local-exec" {
     when        = create
     interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "Remove-Item ${self.keepers.stderr_file}" : "rm ${self.keepers.stderr_file}"
+    command     = dirname("/") == "\\" ? "Remove-Item ${null_resource.shell.triggers.stderr_file}" : "rm ${null_resource.shell.triggers.stderr_file}"
     on_failure  = fail
     working_dir = "${path.module}/tmpfiles"
   }
   provisioner "local-exec" {
     when        = create
     interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "Remove-Item ${self.keepers.exit_code_file}" : "rm ${self.keepers.exit_code_file}"
+    command     = dirname("/") == "\\" ? "Remove-Item ${null_resource.shell.triggers.exit_code_file}" : "rm ${null_resource.shell.triggers.exit_code_file}"
     on_failure  = fail
     working_dir = "${path.module}/tmpfiles"
   }
