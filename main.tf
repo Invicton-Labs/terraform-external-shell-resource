@@ -149,6 +149,10 @@ locals {
 // Use this as a resourced-based method to take an input that might change when the output files are missing,
 // but the triggers haven't changed, and maintain the same output.
 resource "random_id" "outputs" {
+  // Always wait for everything to be done with the external shell before we try to store or delete anything
+  depends_on = [
+    null_resource.shell
+  ]
   // Reload the data when any of the main triggers change
   // We use a hash so it doesn't have a massive output in the Terraform plan
   keepers     = {
@@ -179,21 +183,21 @@ resource "random_id" "outputs" {
   provisioner "local-exec" {
     when        = create
     interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "Remove-Item ${null_resource.shell.triggers.stdout_file}" : "rm ${null_resource.shell.triggers.stdout_file}"
+    command     = dirname("/") == "\\" ? "if (Test-Path -Path ${null_resource.shell.triggers.stdout_file}) { Remove-Item -Path ${null_resource.shell.triggers.stdout_file} }" : "rm -f ${null_resource.shell.triggers.stdout_file}"
     on_failure  = fail
     working_dir = "${path.module}/tmpfiles"
   }
   provisioner "local-exec" {
     when        = create
     interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "Remove-Item ${null_resource.shell.triggers.stderr_file}" : "rm ${null_resource.shell.triggers.stderr_file}"
+    command     = dirname("/") == "\\" ? "if (Test-Path -Path ${null_resource.shell.triggers.stderr_file}) { Remove-Item -Path ${null_resource.shell.triggers.stderr_file} }" : "rm -f ${null_resource.shell.triggers.stderr_file}"
     on_failure  = fail
     working_dir = "${path.module}/tmpfiles"
   }
   provisioner "local-exec" {
     when        = create
     interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "Remove-Item ${null_resource.shell.triggers.exit_code_file}" : "rm ${null_resource.shell.triggers.exit_code_file}"
+    command     = dirname("/") == "\\" ? "if (Test-Path -Path ${null_resource.shell.triggers.exit_code_file}) { Remove-Item -Path ${null_resource.shell.triggers.exit_code_file} }" : "rm -f ${null_resource.shell.triggers.exit_code_file}"
     on_failure  = fail
     working_dir = "${path.module}/tmpfiles"
   }
