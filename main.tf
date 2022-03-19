@@ -7,8 +7,8 @@ locals {
   null_command_unix    = ":"
   null_command_windows = "% ':'"
 
-  command_unix                 = replace(replace(chomp(var.command_unix != null ? var.command_unix : (var.command_windows != null ? var.command_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
-  command_windows              = chomp(var.command_windows != null ? var.command_windows : (var.command_unix != null ? var.command_unix : local.null_command_windows))
+  command_unix            = replace(replace(chomp(var.command_unix != null ? var.command_unix : (var.command_windows != null ? var.command_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
+  command_windows         = chomp(var.command_windows != null ? var.command_windows : (var.command_unix != null ? var.command_unix : local.null_command_windows))
   command_destroy_unix    = replace(replace(chomp(var.command_destroy_unix != null ? var.command_destroy_unix : (var.command_destroy_windows != null ? var.command_destroy_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
   command_destroy_windows = chomp(var.command_destroy_windows != null ? var.command_destroy_windows : (var.command_destroy_unix != null ? var.command_destroy_unix : local.null_command_windows))
 
@@ -20,14 +20,14 @@ locals {
     // If the triggers change, that obviously triggers a re-create
     triggers = local.input_triggers
     // If any of the commands change
-    command_unix                 = local.command_unix
-    command_windows              = local.command_windows
+    command_unix            = local.command_unix
+    command_windows         = local.command_windows
     command_destroy_unix    = local.command_destroy_unix
     command_destroy_windows = local.command_destroy_windows
 
     // If the environment variables change
     // We jsonencode because the `triggers`/`keepers` expect a map of string
-    environment           = jsonencode(var.environment)
+    environment = jsonencode(var.environment)
     // Only mark it as sensitive if anything is actually sensitive
     sensitive_environment = length(var.sensitive_environment) > 0 ? sensitive(jsonencode(var.sensitive_environment)) : jsonencode({})
 
@@ -35,12 +35,12 @@ locals {
     working_dir = var.working_dir
 
     // If we want to handle errors differently, that needs a re-create
-    fail_create_on_nonzero_exit_code = var.fail_create_on_nonzero_exit_code
-    fail_create_on_stderr            = var.fail_create_on_stderr
-    fail_create_on_timeout = var.fail_create_on_timeout
+    fail_create_on_nonzero_exit_code  = var.fail_create_on_nonzero_exit_code
+    fail_create_on_stderr             = var.fail_create_on_stderr
+    fail_create_on_timeout            = var.fail_create_on_timeout
     fail_destroy_on_nonzero_exit_code = var.fail_destroy_on_nonzero_exit_code
     fail_destroy_on_stderr            = var.fail_destroy_on_stderr
-    fail_destroy_on_timeout = var.fail_destroy_on_timeout
+    fail_destroy_on_timeout           = var.fail_destroy_on_timeout
 
     // Different timeouts need re-create
     timeout_create  = var.timeout_create == null ? 0 : (var.timeout_create < 0 ? 0 : var.timeout_create)
@@ -72,7 +72,7 @@ module "state_keeper" {
 }
 
 module "dynamic_depends_on" {
-  source = "./dynamic-depends-on"
+  source             = "./dynamic-depends-on"
   dynamic_depends_on = var.dynamic_depends_on
 }
 
@@ -144,6 +144,10 @@ locals {
   stdout_file    = abspath("${path.module}/tmpfiles/${null_resource.shell.triggers.stdout_file}")
   stderr_file    = abspath("${path.module}/tmpfiles/${null_resource.shell.triggers.stderr_file}")
   exit_code_file = abspath("${path.module}/tmpfiles/${null_resource.shell.triggers.exit_code_file}")
+
+  stdout_content   = fileexists(null_resource.shell.id == null ? null : local.stdout_file) ? file(null_resource.shell.id == null ? null : local.stdout_file) : ""
+  stderr_content   = fileexists(null_resource.shell.id == null ? null : local.stderr_file) ? file(null_resource.shell.id == null ? null : local.stderr_file) : ""
+  exitcode_content = chomp(replace(replace(replace(fileexists(null_resource.shell.id == null ? null : local.exit_code_file) ? file(null_resource.shell.id == null ? null : local.exit_code_file) : "", "\r", ""), "\r\n", ""), "\n", ""))
 }
 
 // Use this as a resourced-based method to take an input that might change when the output files are missing,
@@ -155,19 +159,17 @@ resource "random_id" "outputs" {
   ]
   // Reload the data when any of the main triggers change
   // We use a hash so it doesn't have a massive output in the Terraform plan
-  keepers     = {
-    trigger_hash = base64sha256(jsonencode(null_resource.shell.triggers))
-  }
+  keepers     = sensitive(null_resource.shell.triggers)
   byte_length = 8
   // Feed the output values in as prefix. Then we can extract them from the output of this resource,
   // which will only change when the input triggers change
   // We mark this as sensitive just so it doesn't have a massive output in the Terraform plan
   prefix = sensitive("${jsonencode({
     // These ternary operators just force Terraform to wait for the shell execution to be complete before trying to read the file contents
-    stdout    = fileexists(null_resource.shell.id == null ? local.stdout_file : local.stdout_file) ? file(null_resource.shell.id == null ? local.stdout_file : local.stdout_file) : ""
-    stderr    = fileexists(null_resource.shell.id == null ? local.stderr_file : local.stderr_file) ? file(null_resource.shell.id == null ? local.stderr_file : local.stderr_file) : ""
+    stdout = local.stdout_content
+    stderr = local.stderr_content
     // Replace any CR, LF, or CRLF characters with empty strings. We just want to read the exit code number
-    exit_code = chomp(replace(replace(replace(fileexists(null_resource.shell.id == null ? local.exit_code_file : local.exit_code_file) ? file(null_resource.shell.id == null ? local.exit_code_file : local.exit_code_file) : "", "\r", ""), "\r\n", ""), "\n", ""))
+    exit_code = local.exitcode_content
   })}${local.output_separator}")
   // Changes to the prefix shouldn't trigger a recreate, because when run again somewhere where the
   // original output files don't exist (but the shell triggers haven't changed), we don't want to
@@ -182,24 +184,21 @@ resource "random_id" "outputs" {
   // been saved in the state so we no longer need them.
   provisioner "local-exec" {
     when        = create
-    interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "if (Test-Path -Path ${null_resource.shell.triggers.stdout_file}) { Remove-Item -Path ${null_resource.shell.triggers.stdout_file} }" : "rm -f ${null_resource.shell.triggers.stdout_file}"
+    interpreter = local.stdout_content == null ? null : (local.is_windows ? ["powershell.exe"] : [])
+    command     = local.is_windows ? "if (Test-Path -Path ${local.stdout_file}) { Remove-Item -Path ${local.stdout_file} }" : "rm -f ${local.stdout_file}"
     on_failure  = fail
-    working_dir = "${path.module}/tmpfiles"
   }
   provisioner "local-exec" {
     when        = create
-    interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "if (Test-Path -Path ${null_resource.shell.triggers.stderr_file}) { Remove-Item -Path ${null_resource.shell.triggers.stderr_file} }" : "rm -f ${null_resource.shell.triggers.stderr_file}"
+    interpreter = local.stderr_content == null ? null : (local.is_windows ? ["powershell.exe"] : [])
+    command     = local.is_windows ? "if (Test-Path -Path ${local.stderr_file}) { Remove-Item -Path ${local.stderr_file} }" : "rm -f ${local.stderr_file}"
     on_failure  = fail
-    working_dir = "${path.module}/tmpfiles"
   }
   provisioner "local-exec" {
     when        = create
-    interpreter = dirname("/") == "\\" ? ["powershell.exe"] : []
-    command     = dirname("/") == "\\" ? "if (Test-Path -Path ${null_resource.shell.triggers.exit_code_file}) { Remove-Item -Path ${null_resource.shell.triggers.exit_code_file} }" : "rm -f ${null_resource.shell.triggers.exit_code_file}"
+    interpreter = local.exitcode_content == null ? null : (local.is_windows ? ["powershell.exe"] : [])
+    command     = local.is_windows ? "if (Test-Path -Path ${local.exit_code_file}) { Remove-Item -Path ${local.exit_code_file} }" : "rm -f ${local.exit_code_file}"
     on_failure  = fail
-    working_dir = "${path.module}/tmpfiles"
   }
 }
 
