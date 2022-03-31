@@ -5,6 +5,9 @@
 *.tfstate
 *.tfstate.*
 
+# Modules shouldn't use a lock file, only root configs should
+.terraform.lock.hcl
+
 # Crash log files
 crash.log
 
