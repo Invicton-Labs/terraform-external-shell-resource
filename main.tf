@@ -91,7 +91,7 @@ resource "null_resource" "shell" {
       "powershell.exe",
       "${abspath(path.module)}/run.ps1"
       ] : [
-      "bash",
+      "/bin/sh",
       "${abspath(path.module)}/run.sh"
       ], [
       base64encode(abspath("${path.module}/tmpfiles")),
@@ -118,7 +118,7 @@ resource "null_resource" "shell" {
       "powershell.exe",
       "${abspath(path.module)}/run.ps1"
       ] : [
-      "bash",
+      "/bin/sh",
       "${abspath(path.module)}/run.sh"
       ], [
       base64encode(abspath("${path.module}/tmpfiles")),
