@@ -1,4 +1,8 @@
-set -euo pipefail
+# Try to set this, which we want if using bash
+# Other shells might not support it though, so suppress the error
+set -o pipefail 2> /dev/null
+
+set -eu
 
 function tobool() {
   if [ $1 -eq 0 ]; then
