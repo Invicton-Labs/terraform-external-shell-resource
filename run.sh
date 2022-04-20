@@ -14,12 +14,12 @@ function tobool() {
   fi
 }
 
-_temp_dir=$(echo "$1" | base64 --decode); shift
+_temp_dir=$(echo "$1" | base64 -d); shift
 _id="$1"; shift
 _exit_on_nonzero="$(tobool "$1")"; shift
 _exit_on_stderr="$(tobool "$1")"; shift
 _exit_on_timeout="$(tobool "$1")"; shift
-_command=$(echo "$1" | base64 --decode); shift
+_command=$(echo "$1" | base64 -d); shift
 _stdoutfile_name="$1"; shift
 _stderrfile_name="$1"; shift
 _exitcodefile_name="$1"; shift
