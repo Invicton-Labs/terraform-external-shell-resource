@@ -11,12 +11,25 @@ function tobool() {
   fi
 }
 
-_temp_dir=$(echo "$1" | base64 -d); shift
+# Account for platform differences in base64 command
+# Taken from @nknapp contribution to traefik: traefik/traefik#2344
+case "$(uname)" in
+  'Linux')
+    # On Linux, -d should always work. --decode does not work with Alpine's busybox-binary
+    CMD_DECODE_BASE64="base64 -d"
+    ;;
+  *)
+    # Max OS-X supports --decode and -D, but --decode may be supported by other platforms as well.
+    CMD_DECODE_BASE64="base64 --decode"
+    ;;
+esac
+
+_temp_dir=$(echo "$1" | ${CMD_DECODE_BASE64}); shift
 _id="$1"; shift
 _exit_on_nonzero="$(tobool "$1")"; shift
 _exit_on_stderr="$(tobool "$1")"; shift
 _exit_on_timeout="$(tobool "$1")"; shift
-_command=$(echo "$1" | base64 -d); shift
+_command=$(echo "$1" | ${CMD_DECODE_BASE64}); shift
 _stdoutfile_name="$1"; shift
 _stderrfile_name="$1"; shift
 _exitcodefile_name="$1"; shift
