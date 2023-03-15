@@ -1,0 +1,233 @@
+name: "Build"
+
+on: [push, pull_request]
+
+jobs:
+  Linux:
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [
+          "alpine:latest", 
+          "redhat/ubi9:latest",
+          "fedora:latest", 
+          "centos:latest",
+          "ubuntu:latest",
+          "amazonlinux:1",
+          "amazonlinux:2"
+        ]
+        tf_version: [
+          "1.2.0",
+          "1.1.0",
+          "1.0.0",
+          "0.14.0",
+          "0.13.0",
+        ]
+        exclude:
+          # Amazon Linux doesn't have this version
+          # available to install.
+          - image: amazonlinux:1
+            tf_version: 0.13.0
+          - image: amazonlinux:2
+            tf_version: 0.13.0
+
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ matrix.image }}
+      volumes:
+        - ${{ github.workspace }}:/workspace
+    
+    steps:
+
+      - name: Install Terraform (Alpine)
+        if: startsWith(matrix.image, 'alpine:')
+        run: |
+          apk add --no-cache git
+          wget https://releases.hashicorp.com/terraform/${{ matrix.tf_version }}/terraform_${{ matrix.tf_version }}_linux_amd64.zip
+          unzip terraform_${{ matrix.tf_version }}_linux_amd64.zip
+          mv terraform /usr/bin/terraform
+          
+      - name: Install Terraform (Redhat)
+        if: startsWith(matrix.image, 'redhat/')
+        run: |
+          yum -y update
+          yum install -y yum-utils git
+          yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+          yum -y install terraform-${{ matrix.tf_version }}
+
+      - name: Install Terraform (CentOS)
+        if: startsWith(matrix.image, 'centos:')
+        run: |
+          sed -i 's/mirrorlist/#mirrorlist/g' /etc/yum.repos.d/CentOS-*
+          sed -i 's|#baseurl=http://mirror.centos.org|baseurl=http://vault.centos.org|g' /etc/yum.repos.d/CentOS-*
+          yum -y update
+          yum install -y yum-utils git
+          yum-config-manager --add-repo https://rpm.releases.hashicorp.com/RHEL/hashicorp.repo
+          yum -y install terraform-${{ matrix.tf_version }}
+
+      - name: Install Terraform (Amazon Linux)
+        if: startsWith(matrix.image, 'amazonlinux:')
+        run: |
+          yum install -y yum-utils git
+          yum-config-manager --add-repo https://rpm.releases.hashicorp.com/AmazonLinux/hashicorp.repo
+          yum -y install terraform-${{ matrix.tf_version }}
+
+      - name: Install Terraform (Fedora)
+        if: startsWith(matrix.image, 'fedora:')
+        run: |
+          dnf install -y dnf-plugins-core git
+          dnf config-manager --add-repo https://rpm.releases.hashicorp.com/fedora/hashicorp.repo
+          dnf -y install terraform-${{ matrix.tf_version }}
+
+      - name: Install Terraform (Ubuntu)
+        if: startsWith(matrix.image, 'ubuntu:')
+        run: |
+          apt-get update
+          apt-get install -y curl gnupg lsb-release software-properties-common git
+          curl -fsSL https://apt.releases.hashicorp.com/gpg | apt-key add -
+          apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+          apt-get update
+          apt-get install -y terraform=${{ matrix.tf_version }}
+
+      # Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Initialize the workspace
+      - name: Terraform Init
+        working-directory: /workspace/tester
+        run: terraform init
+
+      # We only need to run a plan, since there are no resources used in testing
+      - name: Terraform Plan
+        working-directory: /workspace/tester
+        run: terraform plan
+
+  LinuxShells:
+    strategy:
+      fail-fast: false
+      matrix:
+        tf_version: [
+          "1.2.0",
+          "1.1.0",
+          "1.0.0",
+          "0.14.0",
+          "0.13.0",
+        ]
+
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tester
+    
+    steps:
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ matrix.tf_version }}
+
+      # Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Install shells
+      - name: Install Shells
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bash ksh ash dash
+
+      # Initialize the workspace
+      - name: Terraform Init
+        run: terraform init
+
+      # We only need to run a plan, since there are no resources used in testing
+      - name: Terraform Plan (bash)
+        run: terraform plan -var "unix_interpreter=/bin/bash"
+      - name: Terraform Plan (ksh)
+        run: terraform plan -var "unix_interpreter=/bin/ksh"
+      - name: Terraform Plan (ash)
+        run: terraform plan -var "unix_interpreter=/bin/ash"
+      - name: Terraform Plan (dash)
+        run: terraform plan -var "unix_interpreter=/bin/dash"
+
+  Windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        tf_version: [
+          "1.2.0",
+          "1.1.0",
+          "1.0.0",
+          "0.14.0",
+          "0.13.0",
+        ]
+
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: tester
+    
+    steps:
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ matrix.tf_version }}
+
+      # Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Initialize the workspace
+      - name: Terraform Init
+        run: terraform init
+
+      # We only need to run a plan, since there are no resources used in testing
+      - name: Terraform Plan
+        run: terraform plan
+        
+  MacOS:
+    strategy:
+      fail-fast: false
+      matrix:
+        tf_version: [
+          "1.2.0",
+          "1.1.0",
+          "1.0.0",
+          "0.14.0",
+          "0.13.0",
+        ]
+
+    runs-on: macos-latest
+    defaults:
+      run:
+        shell: sh
+        working-directory: tester
+    
+    steps:
+      - name: Install Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: ${{ matrix.tf_version }}
+
+      # Checkout the repository
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      # Initialize the workspace
+      - name: Terraform Init
+        run: terraform init
+
+      # We only need to run a plan, since there are no resources used in testing
+      - name: Terraform Plan
+        run: terraform plan
+
+  # This job just waits for all other jobs to pass. We have it here
+  # so our branch protection rule can reference a single job, instead
+  # of needing to list every matrix value of every job above.
+  Passed:
+    runs-on: ubuntu-latest
+    needs: [Linux, LinuxShells, Windows, MacOS]
+    steps:
+    - name: Mark tests as passed
+      run: echo "🎉"

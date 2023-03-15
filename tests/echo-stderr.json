@@ -1,0 +1,9 @@
+{
+    "command_unix": ">&2 echo \"hello world\"",
+    "platforms": [
+        "unix"
+    ],
+    "expected_stdout": "",
+    "expected_stderr": "hello world",
+    "expected_exit_code": 0
+}

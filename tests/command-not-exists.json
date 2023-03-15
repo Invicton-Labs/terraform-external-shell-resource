@@ -1,0 +1,12 @@
+{
+    "command_unix": "if ! command -v \"$COMMAND\" >/dev/null 2>/dev/null; then\necho 'does not exist'\nexit $EXITCODE\nelse\necho 'exists'\nexit 0\nfi",
+    "command_windows": "$ErrorActionPreference = 'stop'\ntry {\nif(Get-Command $Env:COMMAND){\nWrite-Output \"exists\"\nexit 0\n}\n}\nCatch {\nWrite-Output \"does not exist\"\nexit [int]$Env:EXITCODE\n}",
+    "fail_create_on_nonzero_exit_code": false,
+    "environment": {
+        "COMMAND": "somerandomcommandthatshouldnotexist",
+        "EXITCODE": 33
+    },
+    "expected_stdout": "does not exist",
+    "expected_stderr": "",
+    "expected_exit_code": 33
+}

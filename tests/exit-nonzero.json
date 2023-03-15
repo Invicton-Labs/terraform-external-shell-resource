@@ -1,0 +1,7 @@
+{
+    "command_unix": "exit 123",
+    "fail_create_on_nonzero_exit_code": false,
+    "expected_stdout": "",
+    "expected_stderr": "",
+    "expected_exit_code": 123
+}

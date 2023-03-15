@@ -1,0 +1,7 @@
+{
+    "command_unix": "echo \"hello world\"",
+    "command_windows": "Write-Output \"hello world\"",
+    "expected_stdout": "hello world",
+    "expected_stderr": "",
+    "expected_exit_code": 0
+}

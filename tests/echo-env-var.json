@@ -1,0 +1,14 @@
+{
+    "command_unix": "echo \"${INPUT}-${lowerINPUT1234}-${MULTILINE}\"",
+    "command_windows": "Write-Output \"$Env:INPUT-$Env:lowerINPUT1234-$Env:MULTILINE\"",
+    "environment": {
+        "INPUT": "hello world",
+        "lowerINPUT1234": "goodbye world"
+    },
+    "environment_sensitive": {
+        "MULTILINE": "line1\nline2\nline3"
+    },
+    "expected_stdout": "hello world-goodbye world-line1\nline2\nline3",
+    "expected_stderr": "",
+    "expected_exit_code": 0
+}

@@ -3,53 +3,76 @@ $ErrorActionPreference = "Stop"
 
 # Equivalent of set -u (https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/set-strictmode?view=powershell-7.1)
 set-strictmode -version 3.0
-$_temp_dir = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($args[0]))
-$_id = $args[1]
-$_exit_on_nonzero = [System.Convert]::ToBoolean($args[2])
-$_exit_on_stderr = [System.Convert]::ToBoolean($args[3])
-$_exit_on_timeout = [System.Convert]::ToBoolean($args[4])
-$_command = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($args[5]))
-$_stdoutfile_name = $args[6]
-$_stderrfile_name = $args[7]
-$_exitcodefile_name = $args[8]
-$_timeout = $args[9]
-$_is_delete = [System.Convert]::ToBoolean($args[10])
-$_debug = [System.Convert]::ToBoolean($args[11])
 
-# Determine the temporary file names to use
-$_stdoutfile = "$_temp_dir/$_stdoutfile_name"
-$_stderrfile = "$_temp_dir/$_stderrfile_name"
-$_exitcodefile = "$_temp_dir/$_exitcodefile_name"
-if ($_is_delete) {
-    $_cmdfile = "$_temp_dir/$_id.delete.ps1"
-    $_debugfile = "$_temp_dir/$_id.delete.debug"
+$_inputs = $args[0].Split("|")
+
+$_execution_id = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[0]))
+$_directory = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[1]))
+$_environment_file_name = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[2]))
+$_timeout = [System.Convert]::ToInt32([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[3])))
+$_exit_on_nonzero = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[4])))
+$_exit_on_stderr = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[5])))
+$_exit_on_timeout = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[6])))
+$_debug = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[7])))
+$_cmdfile = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[8]))
+$_is_create = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[9])))
+$_stdout_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[10]))
+$_stderr_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[11]))
+$_exitcode_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[12]))
+
+if ($_is_create) {
+    $_debugfile = "$_directory/$_execution_id.create.debug.txt"
 }
 else {
-    $_cmdfile = "$_temp_dir/$_id.create.ps1"
-    $_debugfile = "$_temp_dir/$_id.create.debug"
+    $_debugfile = "$_directory/$_execution_id.delete.debug.txt"
 }
+
+$_cmdfile = "$_directory/$_cmdfile"
+$_environment_file = "$_directory/$_environment_file_name"
+
+$_environment = [System.IO.File]::ReadAllText("$_environment_file")
+
+# Remove any existing output files with the same UUID
+if (Test-Path -Path "$_stdout_file") {
+    Remove-Item -Path "$_stdout_file"
+}
+if (Test-Path -Path "$_stderr_file") {
+    Remove-Item -Path "$_stderr_file"
+}
+if (Test-Path -Path "$_exitcode_file") {
+    Remove-Item -Path "$_exitcode_file"
+}
+if (Test-Path -Path "$_environment_file") {
+    Remove-Item -Path "$_environment_file"
+}
+
+
+####################################################################
+# Everything from here to the next marker should be identical 
+# to the InvictonLabs/shell-data/external module's PowerShell script
+####################################################################
 
 if ($_debug) { Write-Output "Arguments loaded" | Out-File -FilePath "$_debugfile" }
 
-# Remove any existing output files with the same UUID
-if (Test-Path -Path "$_stdoutfile") {
-    Remove-Item -Path "$_stdoutfile"
+# Set the environment variables
+$_env_vars = $_environment.Split(";")
+foreach ($_env in $_env_vars) {
+    if ( "$_env" -eq "" ) {
+        continue
+    }
+    $_env_parts = $_env.Split(":")
+    [Environment]::SetEnvironmentVariable([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_env_parts[0])), [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_env_parts[1])), "Process") 
 }
-if (Test-Path -Path "$_stderrfile") {
-    Remove-Item -Path "$_stderrfile"
-}
-if (Test-Path -Path "$_exitcodefile") {
-    Remove-Item -Path "$_exitcodefile"
-}
+
+if ($_debug) { Write-Output "Environment variables set" | Out-File -FilePath "$_debugfile" }
 
 # Write the command to a file
-[System.IO.File]::WriteAllText("$_cmdfile", "$_command")
-
 # Always force the command file to exit with the last exit code
-[System.IO.File]::AppendAllText("$_cmdfile", "`n`nExit `$LASTEXITCODE")
+[System.IO.File]::AppendAllText("$_cmdfile", "`nExit `$LASTEXITCODE")
 
 if ($_debug) { Write-Output "Command file prepared" | Out-File -Append -FilePath "$_debugfile" }
 
+# This is a function that recursively kills all child processes of a process
 function TreeKill([int]$ProcessId) {
     if ($_debug) { Write-Output "Getting process children for $ProcessId" | Out-File -Append -FilePath "$_debugfile" }
     Get-CimInstance Win32_Process | Where-Object { $_.ParentProcessId -eq $ProcessId } | ForEach-Object { TreeKill -ProcessId $_.ProcessId }
@@ -57,9 +80,9 @@ function TreeKill([int]$ProcessId) {
     $_p = Get-Process -ErrorAction SilentlyContinue -Id $ProcessId
     if ($_p) {
         Stop-Process -Force -Id $ProcessId
-        $_p.WaitForExit(10000)
+        $_p.WaitForExit(10000) | Out-Null
         if (!$_p.HasExited) {
-            $_err = "Failed to read stdout file after waiting for $_delay seconds:`n$_"
+            $_err = "Failed to kill the process after waiting for $_delay seconds:`n$_"
             if ($_debug) { Write-Output "$_err" | Out-File -Append -FilePath "$_debugfile" }
             Write-Error "$_err"
             Exit -1
@@ -67,99 +90,68 @@ function TreeKill([int]$ProcessId) {
     }
 }
 
-# Start the process
-$_timeout_error = $null
-if ($_debug) { Write-Output "Starting process" | Out-File -Append -FilePath "$_debugfile" }
-$_process = Start-Process powershell.exe -ArgumentList "-file ""$_cmdfile""" -PassThru -NoNewWindow -RedirectStandardError "$_stderrfile" -RedirectStandardOutput "$_stdoutfile"
+$_pinfo = New-Object System.Diagnostics.ProcessStartInfo
+$_pinfo.FileName = "powershell.exe"
+# This allows capturing the output to a variable
+$_pinfo.RedirectStandardError = $true
+$_pinfo.RedirectStandardOutput = $true
+$_pinfo.UseShellExecute = $false
+$_pinfo.CreateNoWindow = $false
+$_pinfo.Arguments = "-NoProfile -File `"$_cmdfile`""
+$_process = New-Object System.Diagnostics.Process
+$_process.StartInfo = $_pinfo
 
-if ( $_timeout -eq "0" ) {
-    # If there's no timeout set, just wait it out indefinitely
-    if ($_debug) { Write-Output "Waiting for process to complete with no timeout" | Out-File -Append -FilePath "$_debugfile" }
-    $_process | Wait-Process -ErrorAction SilentlyContinue
-    # Capture the exit code when it's done
-    $_exitcode = $_process.ExitCode
+if ($_debug) { Write-Output "Starting process" | Out-File -Append -FilePath "$_debugfile" }
+
+$ErrorActionPreference = "Continue"
+$_process.Start() | Out-Null
+$_out_task = $_process.StandardOutput.ReadToEndAsync();
+$_err_task = $_process.StandardError.ReadToEndAsync();
+$_timed_out = $false
+
+if ([int]$_timeout -eq 0) {
+    $_process.WaitForExit() | Out-Null
 }
 else {
-    # If there is a timeout set, wait for the specified number of seconds
-    if ($_debug) { Write-Output "Waiting for process to complete with $_timeout second timeout" | Out-File -Append -FilePath "$_debugfile" }
-    $_process | Wait-Process -Timeout $_timeout -ErrorAction SilentlyContinue -ErrorVariable _timeout_error
-    # Check if it timed out
-    if ($_timeout_error) {
-        # If it did, kill the process
+    $_process_result = $_process.WaitForExit($_timeout * 1000)
+    if (-Not $_process_result) {
         if ($_debug) { Write-Output "Process timed out, killing..." | Out-File -Append -FilePath "$_debugfile" }
         TreeKill -ProcessId $_process.Id
-        
-        # Once the process is killed, set the error code to -1 if we're supposed to exit on a timeout
-        if ($_debug) { Write-Output "Successfully killed process" | Out-File -Append -FilePath "$_debugfile" }
-        $_exitcode = if ($_exit_on_timeout) { -1 } else { 0 }
+        $_timed_out = $true
+    }
+}
+$ErrorActionPreference = "Stop"
+
+if ($_debug) { Write-Output "Finished process" | Out-File -Append -FilePath "$_debugfile" }
+
+$_stdout = $_out_task.Result
+$_stderr = $_err_task.Result
+$_exitcode = $_process.ExitCode
+
+# Delete the command file, unless we're using debug mode,
+# in which case we might want to review it for debugging
+# purposes.
+if ( -not $_debug ) {
+    Remove-Item "$_cmdfile"
+}
+
+# Check if the execution timed out
+if ($_timed_out) {
+    # If it did, check if we're supposed to exit the script on a timeout
+    if ( $_exit_on_timeout ) {
+        $ErrorActionPreference = "Continue"
+        Write-Error "Execution timed out after $_timeout seconds"
+        $ErrorActionPreference = "Stop"
+        Exit -1
     }
     else {
-        # It didn't time out, so capture the exit code
-        $_exitcode = $_process.ExitCode
+        $_exitcode = "null"
     }
 }
-if ($_debug) { Write-Output "Execution complete" | Out-File -Append -FilePath "$_debugfile" }
 
-function ReadFileAfterUnlock([string]$Filename, [int]$IntervalMilli, [int]$WaitCycles) {
-    $_contents = $null
-    $i = 0
-    while ($true) {
-        $_delay = $i * $IntervalMilli / 1000
-        try {
-            $_contents = [System.IO.File]::ReadAllText("$Filename")
-            break
-        }
-        catch {
-            if ($i -lt $WaitCycles) {
-                Start-Sleep -Milliseconds $IntervalMilli
-                $i = $i + 1
-                continue
-            }
-            if ($_debug) { Write-Output "Failed to read $Filename after $i attempts" | Out-File -Append -FilePath "$_debugfile" }
-            Write-Error "Failed to read stdout file after waiting for $_delay seconds:`n$_"
-            Exit -1
-        }
-    }
-    $_contents
-}
-
-if ($_debug) { Write-Output "Reading stdout file" | Out-File -Append -FilePath "$_debugfile" }
-$_stdout = ReadFileAfterUnlock -Filename "$_stdoutfile" -IntervalMilli 100 -WaitCycles 300
-if ($_debug) { Write-Output "Reading stderr file" | Out-File -Append -FilePath "$_debugfile" }
-$_stderr = ReadFileAfterUnlock -Filename "$_stderrfile" -IntervalMilli 100 -WaitCycles 300
-if ($_debug) { Write-Output "Finished reading output files" | Out-File -Append -FilePath "$_debugfile" }
-
-# If the error was due to a timeout, prepend the stderr with that message
-if ($_timeout_error) {
-    $_stderr = "TIMEOUT after $_timeout seconds.`n" + $_stderr
-}
-
-# Delete the command file
-if ($_debug) { Write-Output "Deleting command file" | Out-File -Append -FilePath "$_debugfile" }
-Remove-Item "$_cmdfile"
-if ($_debug) { Write-Output "Command file deleted" | Out-File -Append -FilePath "$_debugfile" }
-
-$_die = $false
-if ($_exit_on_timeout -and $_timeout_error ) {
-    $_die = $true
-    if ($_debug) { Write-Output "Failing due to a timeout error" | Out-File -Append -FilePath "$_debugfile" }
-}
-elseif ($_exit_on_nonzero -and $_exitcode) {
-    $_die = $true
-    if ($_debug) { Write-Output "Failing due to a non-zero exit code ($_exitcode)" | Out-File -Append -FilePath "$_debugfile" }
-}
-elseif ($_exit_on_stderr -and "$_stderr") {
-    $_die = $true
-    if ($_debug) { Write-Output "Failing due to presence of stderr output" | Out-File -Append -FilePath "$_debugfile" }
-}
-
-if ($_die) {
-    if ($_debug) { Write-Output "Deleting stdout and stderr files" | Out-File -Append -FilePath "$_debugfile" }
-    Remove-Item "$_stdoutfile"
-    Remove-Item "$_stderrfile"
-
-    if ($_debug) { Write-Output "`nStdout:`n$_stdout" | Out-File -Append -FilePath "$_debugfile" }
-    if ($_debug) { Write-Output "`nStderr:`n$_stderr" | Out-File -Append -FilePath "$_debugfile" }
+# If we want to kill Terraform on a non-zero exit code and the exit code was non-zero, OR
+# we want to kill Terraform on a non-empty stderr and the stderr was non-empty
+if ((( $_exit_on_nonzero ) -and ($_exitcode -ne 0) -and ($_exitcode -ne "null")) -or (( $_exit_on_stderr ) -and "$_stderr")) {
     # If there was a stderr, write it out as an error
     if ("$_stderr") {
         # Set continue to not kill the process on writing an error, so we can exit with the desired exit code
@@ -167,21 +159,26 @@ if ($_die) {
         Write-Error "$_stderr"
         $ErrorActionPreference = "Stop"
     }
-    
     # If a non-zero exit code was given, exit with it
-    if ($_exitcode) {
+    if (($_exitcode -ne 0) -and ($_exitcode -ne "null")) {
         exit $_exitcode
     }
-    
     # Otherwise, exit with a default non-zero exit code
     exit 1
 }
 
-# If it's not a delete (it's a create), write the stdout/stderr/exitcode out to file for Terraform to read
-if (!$_is_delete) {
+
+#############################################
+# Outputs are different for data and resource
+#############################################
+
+# Only write output files if it's a create (not a destroy)
+if ($_is_create) {
     if ($_debug) { Write-Output "Creating output files" | Out-File -Append -FilePath "$_debugfile" }
-    [System.IO.File]::WriteAllText("$_stderrfile", "$_stderr")
-    [System.IO.File]::WriteAllText("$_exitcodefile", "$_exitcode")
+    [System.IO.File]::WriteAllText("$_stdout_file", $_stdout)
+    [System.IO.File]::WriteAllText("$_stderr_file", $_stderr)
+    [System.IO.File]::WriteAllText("$_exitcode_file", $_exitcode)
 }
+
 if ($_debug) { Write-Output "Done!" | Out-File -Append -FilePath "$_debugfile" }
 Exit 0
