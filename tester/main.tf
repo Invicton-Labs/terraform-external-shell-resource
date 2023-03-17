@@ -1,8 +1,7 @@
 locals {
   test_file_path = "${path.module}/../tests/"
-  // The ternary within the fileset just forces TF to wait for the delete_existing_files module before going any further
-  test_files = fileset(local.test_file_path, "${local.test_file_path}**.json")
-  platform   = dirname("/") == "\\" ? "windows" : "unix"
+  test_files     = fileset(local.test_file_path, "${local.test_file_path}**.json")
+  platform       = dirname("/") == "\\" ? "windows" : "unix"
   tests = {
     for test_file in local.test_files :
     replace(replace(trimsuffix(trimprefix(test_file, local.test_file_path), ".json"), "\\", "/"), "/", "_") => jsondecode(file("${local.test_file_path}${test_file}"))
@@ -68,14 +67,14 @@ locals {
 
 module "assert_test_fields_valid" {
   source        = "Invicton-Labs/assertion/null"
-  version       = "~>0.2.1"
+  version       = "~>0.2.2"
   condition     = local.invalid_fields_err_msg == null
   error_message = local.invalid_fields_err_msg
 }
 
 module "assert_expected_output_fields" {
   source        = "Invicton-Labs/assertion/null"
-  version       = "~>0.2.1"
+  version       = "~>0.2.2"
   condition     = local.missing_expected_output_err_msg == null
   error_message = local.missing_expected_output_err_msg
 }
@@ -110,7 +109,7 @@ locals {
     name => flatten([
       contains(local.tests_fields[name], "expected_stdout") ? config.expected_stdout != module.tests[name].stdout ? ["Incorrect value for stdout: expected \"${config.expected_stdout}\", got \"${module.tests[name].stdout}\""] : [] : [],
       contains(local.tests_fields[name], "expected_stderr") ? config.expected_stderr != module.tests[name].stderr ? ["Incorrect value for stderr: expected \"${config.expected_stderr}\", got \"${module.tests[name].stderr}\""] : [] : [],
-      contains(local.tests_fields[name], "expected_exit_code") ? config.expected_exit_code != module.tests[name].exit_code ? ["Incorrect value for exit code: expected \"${config.expected_exit_code == null ? "null" : config.expected_exit_code}\", got \"${module.tests[name].exit_code == null ? "null" : module.tests[name].exit_code}\""] : [] : [],
+      contains(local.tests_fields[name], "expected_exit_code") ? config.expected_exit_code != module.tests[name].exit_code || (config.expected_exit_code == null && module.tests[name].exit_code != null) || (config.expected_exit_code != null && module.tests[name].exit_code == null) ? ["Incorrect value for exit code: expected \"${config.expected_exit_code == null ? "null" : config.expected_exit_code}\", got \"${module.tests[name].exit_code == null ? "null" : module.tests[name].exit_code}\""] : [] : [],
     ])
   }
 
@@ -125,7 +124,7 @@ locals {
 
 module "assert_expected_output" {
   source        = "Invicton-Labs/assertion/null"
-  version       = "~>0.2.1"
+  version       = "~>0.2.2"
   condition     = local.incorrect_output_err_msg == null
   error_message = local.incorrect_output_err_msg
 }

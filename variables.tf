@@ -80,7 +80,7 @@ locals {
 }
 
 variable "working_dir" {
-  description = "The working directory where command will be executed. Defaults to this module's install directory (usually somewhere in the `.terraform` directory)."
+  description = "The working directory where command will be executed. Defaults to this module's install directory (usually somewhere in the `.terraform` directory). If you use this field, it is highly recommended that you only use relative paths, otherwise applications on different machines with different absolute paths to the Terraform directory will trigger re-creates."
   type        = string
   default     = null
 }

@@ -6,19 +6,20 @@ set-strictmode -version 3.0
 
 $_inputs = $args[0].Split("|")
 
-$_execution_id = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[0]))
-$_directory = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[1]))
-$_environment_file_name = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[2]))
-$_timeout = [System.Convert]::ToInt32([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[3])))
-$_exit_on_nonzero = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[4])))
-$_exit_on_stderr = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[5])))
-$_exit_on_timeout = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[6])))
-$_debug = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[7])))
-$_cmdfile = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[8]))
-$_is_create = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[9])))
-$_stdout_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[10]))
-$_stderr_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[11]))
-$_exitcode_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[12]))
+$_uses_input_files = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[0])))
+$_is_create = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[1])))
+$_environment_input = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[2]))
+$_command_input = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[3]))
+$_timeout = [System.Convert]::ToInt32([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[4])))
+$_exit_on_nonzero = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[5])))
+$_exit_on_stderr = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[6])))
+$_exit_on_timeout = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[7])))
+$_execution_id = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[8]))
+$_directory = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[9]))
+$_debug = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[10])))
+$_stdout_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[11]))
+$_stderr_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[12]))
+$_exitcode_file = "$_directory/" + [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[13]))
 
 if ($_is_create) {
     $_debugfile = "$_directory/$_execution_id.create.debug.txt"
@@ -27,10 +28,27 @@ else {
     $_debugfile = "$_directory/$_execution_id.delete.debug.txt"
 }
 
-$_cmdfile = "$_directory/$_cmdfile"
-$_environment_file = "$_directory/$_environment_file_name"
-
-$_environment = [System.IO.File]::ReadAllText("$_environment_file")
+if ($_uses_input_files) {
+    $_cmdfile = "$_directory/$_command_input"
+    $_envfile = "$_directory/$_environment_input"
+    $_environment = [System.IO.File]::ReadAllText("$_envfile")
+    # Delete the environment input file immediately after reading it
+    # unless we're using debug mode, in which case we might want to 
+    # review it for debugging purposes.
+    if ( -not $_debug ) {
+        Remove-Item -Path "$_envfile"
+    }
+}
+else {
+    if ($_is_create) {
+        $_cmdfile = "$_directory/$_execution_id.create.ps1"
+    }
+    else {
+        $_cmdfile = "$_directory/$_execution_id.delete.ps1"
+    }
+    [System.IO.File]::WriteAllText("$_cmdfile", "$_command_input")
+    $_environment = $_environment_input
+}
 
 # Remove any existing output files with the same UUID
 if (Test-Path -Path "$_stdout_file") {
@@ -42,8 +60,9 @@ if (Test-Path -Path "$_stderr_file") {
 if (Test-Path -Path "$_exitcode_file") {
     Remove-Item -Path "$_exitcode_file"
 }
-if (Test-Path -Path "$_environment_file") {
-    Remove-Item -Path "$_environment_file"
+# Remove any existing output files with the same UUID
+if (Test-Path -Path "$_debugfile") {
+    Remove-Item -Path "$_debugfile"
 }
 
 
@@ -132,7 +151,7 @@ $_exitcode = $_process.ExitCode
 # in which case we might want to review it for debugging
 # purposes.
 if ( -not $_debug ) {
-    Remove-Item "$_cmdfile"
+    Remove-Item -Path "$_cmdfile"
 }
 
 # Check if the execution timed out
@@ -175,9 +194,9 @@ if ((( $_exit_on_nonzero ) -and ($_exitcode -ne 0) -and ($_exitcode -ne "null"))
 # Only write output files if it's a create (not a destroy)
 if ($_is_create) {
     if ($_debug) { Write-Output "Creating output files" | Out-File -Append -FilePath "$_debugfile" }
-    [System.IO.File]::WriteAllText("$_stdout_file", $_stdout)
-    [System.IO.File]::WriteAllText("$_stderr_file", $_stderr)
-    [System.IO.File]::WriteAllText("$_exitcode_file", $_exitcode)
+    [System.IO.File]::WriteAllText("$_stdout_file", "$_stdout")
+    [System.IO.File]::WriteAllText("$_stderr_file", "$_stderr")
+    [System.IO.File]::WriteAllText("$_exitcode_file", "$_exitcode")
 }
 
 if ($_debug) { Write-Output "Done!" | Out-File -Append -FilePath "$_debugfile" }

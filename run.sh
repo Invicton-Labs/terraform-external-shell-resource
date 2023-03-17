@@ -39,40 +39,36 @@ fi
 
 # We know that all of the inputs are base64-encoded, and "|" is not a valid base64 character, so therefore it
 # cannot possibly be included in the stdin.
-_execution_id="$(echo "${1}" | base64 $_decode_flag)"; shift
-_directory="$(echo "${1}" | base64 $_decode_flag)"; shift
-_environment_file_name="$(echo "${1}" | base64 $_decode_flag)"; shift
-_timeout="$(echo "${1}" | base64 $_decode_flag)"; shift
-_exit_on_nonzero="$(echo "${1}" | base64 $_decode_flag)"; shift
-_exit_on_stderr="$(echo "${1}" | base64 $_decode_flag)"; shift
-_exit_on_timeout="$(echo "${1}" | base64 $_decode_flag)"; shift
-_debug="$(echo "${1}" | base64 $_decode_flag)"; shift
-_command_b64="${1}"; shift
-_is_create="$(echo "${1}" | base64 $_decode_flag)"; shift
-_stdoutfile_name="$(echo "${1}" | base64 $_decode_flag)"; shift
-_stderrfile_name="$(echo "${1}" | base64 $_decode_flag)"; shift
-_exitcodefile_name="$(echo "${1}" | base64 $_decode_flag)"; shift
-_shell="$(echo "${1}" | base64 $_decode_flag)"; shift
+IFS="|"
+set -o noglob
+set -- ${1}""
+
+_is_create="$(echo "${2}" | base64 $_decode_flag)"
+_environment="$(echo "${3}" | base64 $_decode_flag)"
+_command_b64="${4}"
+_timeout="$(echo "${5}" | base64 $_decode_flag)"
+_exit_on_nonzero="$(echo "${6}" | base64 $_decode_flag)"
+_exit_on_stderr="$(echo "${7}" | base64 $_decode_flag)"
+_exit_on_timeout="$(echo "${8}" | base64 $_decode_flag)"
+_execution_id="$(echo "${9}" | base64 $_decode_flag)"
+_directory="$(echo "${10}" | base64 $_decode_flag)"
+_debug="$(echo "${11}" | base64 $_decode_flag)"
+_stdoutfile_name="$(echo "${12}" | base64 $_decode_flag)"
+_stderrfile_name="$(echo "${13}" | base64 $_decode_flag)"
+_exitcodefile_name="$(echo "${14}" | base64 $_decode_flag)"
+_shell="$(echo "${15}" | base64 $_decode_flag)"
 
 # The filenames to direct output to
 _stderrfile="$_directory/$_stderrfile_name"
 _stdoutfile="$_directory/$_stdoutfile_name"
 _exitcodefile="$_directory/$_exitcodefile_name"
 _debugfile="$_directory/$_execution_id.debug"
-_environment_file="$_directory/$_environment_file_name"
-
-_environment="$(cat $_environment_file)"
 
 # Remove any existing output files with the same UUID
 rm -f "$_stderrfile"
 rm -f "$_stdoutfile"
 rm -f "$_exitcodefile"
 rm -f "$_debugfile"
-
-# Delete the environment file, unless we're in debug mode
-if [ $_debug != "true" ] ; then
-    rm -f "$_environment_file"
-fi
 
 if [ $_debug = "true" ] ; then echo "Arguments loaded" > "$_debugfile"; fi
 
@@ -146,9 +142,6 @@ EOF
     fi
 fi
 
-# Write the exit code to a file
-if [ $_is_create = "true" ]; then echo $_echo_n "${_exitcode}${_echo_c}" > $_exitcodefile; fi
-
 if [ $_debug = "true" ] ; then echo "Execution complete" >> "$_debugfile"; fi
 
 # Read the stderr and stdout files
@@ -169,9 +162,12 @@ if [ "$_timed_out" = "true" ] ; then
     fi
 fi
 
+# Write the exit code to a file
+if [ $_is_create = "true" ]; then echo $_echo_n "${_exitcode}${_echo_c}" > $_exitcodefile; fi
+
 # If we want to kill Terraform on a non-zero exit code and the exit code was non-zero, OR
 # we want to kill Terraform on a non-empty stderr and the stderr was non-empty
-if ( [ "$_exit_on_nonzero" = "true" ] && [ "$_exitcode" != "null" ] && [ $_exitcode -ne 0 ] ) || ( [ "$_exit_on_stderr" = "true" ] && ! [ -z "$_stderr" ] ); then
+if ( [ "$_exit_on_nonzero" = "true" ] && [ "$_exitcode" != "null" ] && [ $_exitcode -ne 0 ] ) || ( [ "$_exit_on_stderr" = "true" ] && ! [ -z "$_stderr" ] ) ; then
     # If there was a stderr, write it out as an error
     if ! [ -z "$_stderr" ] ; then
         if [ $_debug = "true" ] && [ "$_exit_on_stderr" = "true" ] ; then echo "Failing due to presence of stderr output" >> "$_debugfile"; fi
@@ -179,7 +175,7 @@ if ( [ "$_exit_on_nonzero" = "true" ] && [ "$_exitcode" != "null" ] && [ $_exitc
     fi
 
     # If a non-zero exit code was given, exit with it
-    if ( [ "$_exitcode" != "null" ] && [ "$_exitcode" -ne 0 ] ); then
+    if ( [ "$_exitcode" != "null" ] && [ "$_exitcode" -ne 0 ] ) ; then
         if [ $_debug = "true" ] && [ "$_exit_on_nonzero" = "true" ] ; then echo "Failing due to a non-zero exit code ($_exitcode)" >> "$_debugfile"; fi
         exit $_exitcode
     fi
