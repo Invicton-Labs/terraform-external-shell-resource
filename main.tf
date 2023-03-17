@@ -25,7 +25,7 @@ locals {
   command_destroy_windows = replace(replace(chomp(local.var_command_destroy_windows != null ? local.var_command_destroy_windows : (local.var_command_destroy_unix != null ? local.var_command_destroy_unix : local.null_command_windows)), "\r", ""), "\r\n", "\n")
 
   // Check whether there would be any command to execute on this operating system
-  create_command_exists = local.is_windows ? local.command_windows != local.null_command_windows : local.command_unix != local.null_command_unix
+  create_command_exists = local.is_windows ? local.command_create_windows != local.null_command_windows : local.command_create_unix != local.null_command_unix
 
   // Create versions of the environment variables with all carriage returns removed
   env_vars = {
@@ -67,8 +67,8 @@ locals {
 
     // If any of the commands change, that's a recreate.
     // The create commands don't need to be stored in trigger state, so we can use the sha256 of them.
-    command_unix            = sha256(local.command_unix)
-    command_windows         = sha256(local.command_windows)
+    command_unix            = sha256(local.command_create_unix)
+    command_windows         = sha256(local.command_create_windows)
     command_destroy_unix    = local.command_destroy_unix
     command_destroy_windows = local.command_destroy_windows
 
@@ -131,7 +131,7 @@ locals {
     // environment
     local.all_environment_b64,
     // command
-    base64encode(local.command_windows),
+    base64encode(local.command_create_windows),
     base64encode(local.partial_triggers.timeout_create),
     base64encode(local.partial_triggers.fail_create_on_nonzero_exit_code),
     base64encode(local.partial_triggers.fail_create_on_stderr),
@@ -162,7 +162,7 @@ locals {
     // PowerShell has a max command line length of 8191 characters. We'll trim it to an 7000 char limit.
     // If the total length of the Windows command line inputs exceed this limit, we need to use the file input mode.
     // We include this in the triggers so the provisioners have easy access to this data.
-    windows_file_input_create_required  = local.command_windows != local.null_command_windows && length(local.command_line_create_direct_windows) > 7000
+    windows_file_input_create_required  = local.command_create_windows != local.null_command_windows && length(local.command_line_create_direct_windows) > 7000
     windows_file_input_destroy_required = local.command_destroy_windows != local.null_command_windows && length(local.command_line_destroy_direct_windows) > 7000
   })
 
@@ -172,7 +172,7 @@ locals {
 
   // Windows command file write commands
   windows_command_file_create_command  = <<EOF
-[System.IO.File]::WriteAllText([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${base64encode("${abspath(path.module)}/${local.temp_dir}/${local.all_triggers.command_create_filename_windows}")}")), [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${base64encode(local.command_windows)}")))
+[System.IO.File]::WriteAllText([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${base64encode("${abspath(path.module)}/${local.temp_dir}/${local.all_triggers.command_create_filename_windows}")}")), [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${base64encode(local.command_create_windows)}")))
 [System.IO.File]::WriteAllText([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${base64encode("${abspath(path.module)}/${local.temp_dir}/${local.all_triggers.env_var_file_create}")}")), [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${local.all_environment_b64}")))
 EOF
   windows_command_file_destroy_command = <<EOF
@@ -220,15 +220,29 @@ resource "null_resource" "shell" {
   provisioner "local-exec" {
     when       = create
     on_failure = fail
+    interpreter = flatten(dirname("/") == "\\" ? [
+      local.command_create_windows == self.triggers.null_command_windows ? [
+        "powershell.exe",
+        ] : [
+        "powershell.exe",
+        "-File",
+        "${abspath(path.module)}/run.ps1",
+      ]
+      ] : [
+      local.command_create_unix == self.triggers.null_command_unix ? [
+        self.triggers.unix_interpreter,
+        "-c",
+        ] : [
+        self.triggers.unix_interpreter,
+        "${abspath(path.module)}/run.sh",
+      ]
+    ])
     command = (
-      // Check if the command to execute is the null command for that system (which implies that nothing should be done)
-      dirname("/") == "\\" ? local.command_windows == self.triggers.null_command_windows : local.command_unix == self.triggers.null_command_unix
+      dirname("/") == "\\" ? local.command_create_windows == self.triggers.null_command_windows : local.command_create_unix == self.triggers.null_command_unix
       ) ? (
       // If it is, run a null command that doesn't do anything. Don't bother sending all of the arguments.
-      dirname("/") == "\\" ? "powershell.exe \"${self.triggers.null_command_windows}\"" : "${self.triggers.unix_interpreter} -c \"${self.triggers.null_command_unix}\""
-      ) : (
-      // Otherwise, it's a real command that needs to be run.
-      "${dirname("/") == "\\" ? "powershell.exe \"${abspath(path.module)}/run.ps1\"" : "${self.triggers.unix_interpreter} \"${abspath(path.module)}/run.sh\""} \"${join("|", [
+      dirname("/") == "\\" ? self.triggers.null_command_windows : self.triggers.null_command_unix
+      ) : join("|", [
         // uses_input_files. Only true if running on Windows AND the command line length is too long for Windows.
         base64encode(dirname("/") == "\\" && self.triggers.windows_file_input_create_required ? "true" : "false"),
         // is_create
@@ -239,7 +253,7 @@ resource "null_resource" "shell" {
           "${base64encode(k)}:${base64encode(v)}"
         ])),
         // command
-        base64encode(dirname("/") == "\\" ? (self.triggers.windows_file_input_create_required ? self.triggers.command_create_filename_windows : local.command_windows) : local.command_unix),
+        base64encode(dirname("/") == "\\" ? (self.triggers.windows_file_input_create_required ? self.triggers.command_create_filename_windows : local.command_create_windows) : local.command_create_unix),
         base64encode(self.triggers.timeout_create),
         base64encode(self.triggers.fail_create_on_nonzero_exit_code),
         base64encode(self.triggers.fail_create_on_stderr),
@@ -251,8 +265,7 @@ resource "null_resource" "shell" {
         base64encode(self.triggers.stderr_file),
         base64encode(self.triggers.exitcode_file),
         base64encode(self.triggers.unix_interpreter),
-      ])}\""
-    )
+    ])
     working_dir = self.triggers.working_dir == "" ? null : self.triggers.working_dir
   }
 
@@ -260,15 +273,29 @@ resource "null_resource" "shell" {
   provisioner "local-exec" {
     when       = destroy
     on_failure = fail
+    interpreter = flatten(dirname("/") == "\\" ? [
+      self.triggers.command_destroy_windows == self.triggers.null_command_windows ? [
+        "powershell.exe",
+        ] : [
+        "powershell.exe",
+        "-File",
+        "${abspath(path.module)}/run.ps1",
+      ]
+      ] : [
+      self.triggers.command_destroy_unix == self.triggers.null_command_unix ? [
+        self.triggers.unix_interpreter,
+        "-c",
+        ] : [
+        self.triggers.unix_interpreter,
+        "${abspath(path.module)}/run.sh",
+      ]
+    ])
     command = (
-      // Check if the command to execute is the null command for that system (which implies that nothing should be done)
       dirname("/") == "\\" ? self.triggers.command_destroy_windows == self.triggers.null_command_windows : self.triggers.command_destroy_unix == self.triggers.null_command_unix
       ) ? (
       // If it is, run a null command that doesn't do anything. Don't bother sending all of the arguments.
-      dirname("/") == "\\" ? "powershell.exe \"${self.triggers.null_command_windows}\"" : "${self.triggers.unix_interpreter} -c \"${self.triggers.null_command_unix}\""
-      ) : (
-      // Otherwise, it's a real command that needs to be run.
-      "${dirname("/") == "\\" ? "powershell.exe \"${abspath(path.module)}/run.ps1\"" : "${self.triggers.unix_interpreter} \"${abspath(path.module)}/run.sh\""} \"${join("|", [
+      dirname("/") == "\\" ? self.triggers.null_command_windows : self.triggers.null_command_unix
+      ) : join("|", [
         // uses_input_files. Only true if running on Windows AND the command line length is too long for Windows.
         base64encode(dirname("/") == "\\" && self.triggers.windows_file_input_destroy_required ? "true" : "false"),
         // is_create
@@ -291,7 +318,7 @@ resource "null_resource" "shell" {
         base64encode(self.triggers.stderr_file),
         base64encode(self.triggers.exitcode_file),
         base64encode(self.triggers.unix_interpreter),
-    ])}\"")
+    ])
     working_dir = self.triggers.working_dir == "" ? null : self.triggers.working_dir
   }
 }

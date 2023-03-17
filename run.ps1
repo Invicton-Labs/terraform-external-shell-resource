@@ -4,7 +4,7 @@ $ErrorActionPreference = "Stop"
 # Equivalent of set -u (https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.core/set-strictmode?view=powershell-7.1)
 set-strictmode -version 3.0
 
-$_inputs = $args[0].Split("|")
+$_inputs = $args[0].Trim("`"").Split("|")
 
 $_uses_input_files = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[0])))
 $_is_create = [System.Convert]::ToBoolean([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String($_inputs[1])))
