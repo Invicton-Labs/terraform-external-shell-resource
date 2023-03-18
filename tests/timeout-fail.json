@@ -1,7 +1,7 @@
 {
-    "command_unix": "echo 'hello world'\nsleep 2\necho 'goodbye world'",
-    "command_windows": "Write-Output 'hello world'\nStart-Sleep -Seconds 2\nWrite-Output 'goodbye world'",
-    "timeout_create": 1,
+    "command_unix": "echo 'hello world'\nsleep 6\necho 'goodbye world'",
+    "command_windows": "Write-Output 'hello world'\nStart-Sleep -Seconds 6\nWrite-Output 'goodbye world'",
+    "timeout_create": 3,
     "fail_create_on_timeout": false,
     "expected_stdout": "hello world",
     "expected_stderr": "",
