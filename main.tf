@@ -16,9 +16,9 @@ locals {
   null_command_windows = "% ':'"
 
   // If command_unix is specified, use it. Otherwise, if command_windows is specified, use it. Otherwise, use a command that does nothing
-  command_unix = replace(replace(chomp(local.var_command_unix != null ? local.var_command_unix : (local.var_command_windows != null ? local.var_command_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
+  command_create_unix = replace(replace(chomp(local.var_command_unix != null ? local.var_command_unix : (local.var_command_windows != null ? local.var_command_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
   // If command_windows is specified, use it. Otherwise, if command_unix is specified, use it. Otherwise, use a command that does nothing
-  command_windows = replace(replace(chomp(local.var_command_windows != null ? local.var_command_windows : (local.var_command_unix != null ? local.var_command_unix : local.null_command_windows)), "\r", ""), "\r\n", "\n")
+  command_create_windows = replace(replace(chomp(local.var_command_windows != null ? local.var_command_windows : (local.var_command_unix != null ? local.var_command_unix : local.null_command_windows)), "\r", ""), "\r\n", "\n")
   // If command_destroy_unix is specified, use it. Otherwise, if command_windows is specified, use it. Otherwise, use a command that does nothing
   command_destroy_unix = replace(replace(chomp(local.var_command_destroy_unix != null ? local.var_command_destroy_unix : (local.var_command_destroy_windows != null ? local.var_command_destroy_windows : local.null_command_unix)), "\r", ""), "\r\n", "\n")
   // If command_destroy_windows is specified, use it. Otherwise, if command_unix is specified, use it. Otherwise, use a command that does nothing
@@ -67,8 +67,8 @@ locals {
 
     // If any of the commands change, that's a recreate.
     // The create commands don't need to be stored in trigger state, so we can use the sha256 of them.
-    command_unix            = sha256(local.command_create_unix)
-    command_windows         = sha256(local.command_create_windows)
+    command_create_unix     = sha256(local.command_create_unix)
+    command_create_windows  = sha256(local.command_create_windows)
     command_destroy_unix    = local.command_destroy_unix
     command_destroy_windows = local.command_destroy_windows
 

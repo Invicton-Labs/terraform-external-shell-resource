@@ -3,11 +3,11 @@
 //==================================================
 output "command_unix" {
   description = "The value of the `command_unix` input variable, or the default value if the input was `null`, with all carriage returns removed."
-  value       = local.command_unix
+  value       = local.command_create_unix
 }
 output "command_windows" {
   description = "The value of the `command_windows` input variable, or the default value if the input was `null`, with all carriage returns removed."
-  value       = local.command_windows
+  value       = local.command_create_windows
 }
 output "command_destroy_unix" {
   description = "The value of the `command_destroy_unix` input variable, or the default value if the input was `null`, with all carriage returns removed."
