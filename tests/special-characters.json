@@ -1,0 +1,7 @@
+{
+    "command_unix": "echo \"~@#$%&*()-_=+{}[]<>?/.,'\\\"\\`;!\"",
+    "command_windows": "Write-Output \"~@#$%&*()-_=+{}[]<>?/.,'`\"``;!\"",
+    "expected_stdout": "~@#$%&*()-_=+{}[]<>?/.,'\"`;!",
+    "expected_stderr": "",
+    "expected_exit_code": 0
+}

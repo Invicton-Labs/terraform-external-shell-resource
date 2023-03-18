@@ -1,0 +1,17 @@
+{
+    "platforms": [
+        "windows",
+        "unix"
+    ],
+    "command_destroy_unix": "myvar=$(cat <<EOF\n$INPUT1\n$INPUT2\nEOF\n)\necho \"$myvar\" > \"../tmpfiles/destroy-test.txt\"\necho \"$ERR\"\nexit 0",
+    "command_destroy_windows": "$myvar=@\"\n$Env:INPUT1\n$Env:INPUT2\n\"@\nWrite-Output \"$myvar\" | Out-File -FilePath ../tmpfiles/destroy-test.txt\nWrite-Error \"$Env:ERR\"\nexit 0",
+    "fail_destroy_on_nonzero_exit_code": true,
+    "expected_stdout": "",
+    "environment": {
+        "INPUT1": "hello world",
+        "INPUT2": 4321,
+        "ERR": "goodbye world"
+    },
+    "expected_stderr": "",
+    "expected_exit_code": 0
+}

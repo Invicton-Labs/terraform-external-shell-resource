@@ -1,0 +1,14 @@
+{
+    "platforms": [
+        "windows"
+    ],
+    "command_windows": "$myvar=@\"\n$Env:INPUT1\n$Env:INPUT2\n\"@\nWrite-Output \"$myvar\"\nexit 123",
+    "fail_create_on_nonzero_exit_code": false,
+    "expected_stdout": "hello world\n4321",
+    "environment": {
+        "INPUT1": "hello world",
+        "INPUT2": 4321
+    },
+    "expected_stderr": "",
+    "expected_exit_code": 123
+}

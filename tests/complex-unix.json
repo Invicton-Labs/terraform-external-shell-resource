@@ -1,0 +1,15 @@
+{
+    "platforms": [
+        "unix"
+    ],
+    "command_unix": "myvar=$(cat <<EOF\n$INPUT1\n$INPUT2\nEOF\n)\necho \"$myvar\"\n>&2 echo \"$ERR\"\nexit 123",
+    "fail_create_on_nonzero_exit_code": false,
+    "expected_stdout": "hello world\n4321",
+    "environment": {
+        "INPUT1": "hello world",
+        "INPUT2": 4321,
+        "ERR": "goodbye world"
+    },
+    "expected_stderr": "goodbye world",
+    "expected_exit_code": 123
+}

@@ -1,0 +1,45 @@
+name: "Build"
+
+on: [push, pull_request]
+
+jobs:
+  Matrix:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate Matrix
+        id: matrix
+        uses: Invicton-Labs/terraform-module-testing/matrix@main
+        with:
+          minimum_tf_version: '0.13.1'
+          # 0.15.0 - 0.15.3 has a bug where it doesn't like sensitive-marked outputs
+          excluded_tf_versions: '0.15.0,0.15.1,0.15.2,0.15.3,1.3.0'
+
+      - name: Output Matrix
+        run: |
+          echo "Strategy: ${{ steps.matrix.outputs.strategy }}"
+
+    outputs:
+      strategy: ${{ steps.matrix.outputs.strategy }}
+          
+  Test:
+    needs: [Matrix]
+    strategy: ${{ fromJSON(needs.Matrix.outputs.strategy)}}
+    runs-on: ${{ matrix.runs-on }}
+    container: ${{ matrix.container }}
+    steps:
+      - name: Run Tests
+        id: tests
+        uses: Invicton-Labs/terraform-module-testing/test@main
+        with:
+          testing_path: tester
+          
+  # This job just waits for all other jobs to pass. We have it here
+  # so our branch protection rule can reference a single job, instead
+  # of needing to list every matrix value of every job above.
+  Passed:
+    runs-on: ubuntu-latest
+    needs: [Test]
+    steps:
+    - name: Mark tests as passed
+      run: echo "🎉"

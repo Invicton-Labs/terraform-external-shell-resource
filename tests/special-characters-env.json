@@ -1,0 +1,10 @@
+{
+    "command_unix": "echo \"$CHARACTERS\"",
+    "command_windows": "Write-Output \"$Env:CHARACTERS\"",
+    "environment": {
+        "CHARACTERS": "~@#$%&*()-_=+{}[]<>?/.,'\"`;!"
+    },
+    "expected_stdout": "~@#$%&*()-_=+{}[]<>?/.,'\"`;!",
+    "expected_stderr": "",
+    "expected_exit_code": 0
+}

@@ -1,0 +1,7 @@
+{
+    "command_unix": "a='hello world'\necho \"$a\"",
+    "command_windows": "$a='hello world'\nWrite-Output \"$a\"",
+    "expected_stdout": "hello world",
+    "expected_stderr": "",
+    "expected_exit_code": 0
+}
