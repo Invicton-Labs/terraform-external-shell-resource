@@ -9,7 +9,7 @@ jobs:
     steps:
       - name: Generate Matrix
         id: matrix
-        uses: Invicton-Labs/terraform-module-testing-configuration/matrix@main
+        uses: Invicton-Labs/terraform-module-testing/matrix@dev
         with:
           minimum_tf_version: '0.13.0'
           # 0.15.0 - 0.15.3 has a bug where it doesn't like sensitive-marked outputs
@@ -30,7 +30,7 @@ jobs:
     steps:
       - name: Run Tests
         id: tests
-        uses: Invicton-Labs/terraform-module-testing-configuration/test@main
+        uses: Invicton-Labs/terraform-module-testing/test@dev
         with:
           testing_path: tester
           
