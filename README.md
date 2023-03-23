@@ -70,12 +70,12 @@ module "shell_resource_hello" {
   }
 
   // Environment variables (will be hidden in the Terraform plan output)
-  sensitive_environment = {
+  environment_sensitive = {
     MORETEXT = "World"
   }
 
   // Environment variables that, when changed, will not trigger a re-create
-  triggerless_environment = {
+  environment_triggerless = {
     ORIGINAL_CREATED_TIME = timestamp()
   }
 }
