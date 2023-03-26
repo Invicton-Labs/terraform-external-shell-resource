@@ -9,10 +9,11 @@ jobs:
     steps:
       - name: Generate Matrix
         id: matrix
-        uses: Invicton-Labs/terraform-module-testing/matrix@main
+        uses: Invicton-Labs/terraform-module-testing/matrix@v0.1.0
         with:
           minimum_tf_version: '0.13.1'
           # 0.15.0 - 0.15.3 has a bug where it doesn't like sensitive-marked outputs
+          # 0.13.0 and 1.3.0 have bugs where it doesn't find a map value properly
           excluded_tf_versions: '0.15.0,0.15.1,0.15.2,0.15.3,1.3.0'
 
       - name: Output Matrix
@@ -28,11 +29,34 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     container: ${{ matrix.container }}
     steps:
-      - name: Run Tests
-        id: tests
-        uses: Invicton-Labs/terraform-module-testing/test@main
+
+      - name: Initialize
+        id: init-pass
+        uses: Invicton-Labs/terraform-module-testing/initialize@v0.1.0
         with:
-          testing_path: tester
+          tf_path: tester
+
+      # Do an apply for each shell we want to test, if it's a specific shell
+      - name: Test (bash)
+        if: matrix.shells == 'true'
+        uses: Invicton-Labs/terraform-module-testing/apply-destroy@v0.1.0
+        with:
+          tf_path: tester
+          tf_args: -var="unix_interpreter=/bin/bash"
+
+      - name: Test (dash)
+        if: matrix.shells == 'true'
+        uses: Invicton-Labs/terraform-module-testing/apply-destroy@v0.1.0
+        with:
+          tf_path: tester
+          tf_args: -var="unix_interpreter=/bin/dash"
+
+      # Run the Terraform test without specifying a shell
+      - name: Test (Default Shell)
+        if: matrix.shells != 'true'
+        uses: Invicton-Labs/terraform-module-testing/apply-destroy@v0.1.0
+        with:
+          tf_path: tester
           
   # This job just waits for all other jobs to pass. We have it here
   # so our branch protection rule can reference a single job, instead
