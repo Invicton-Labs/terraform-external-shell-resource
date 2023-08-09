@@ -343,7 +343,7 @@ locals {
   stdout       = local.stdout_content == "" ? "" : trimsuffix(replace(replace(local.stdout_content, "\r", ""), "\r\n", "\n"), "\n")
   stderr       = local.stderr_content == "" ? "" : trimsuffix(replace(replace(local.stderr_content, "\r", ""), "\r\n", "\n"), "\n")
   exitcode_str = local.exitcode_content == "" ? "" : trimspace(replace(replace(local.exitcode_content, "\r", ""), "\r\n", "\n"))
-  exitcode     = !local.create_command_exists ? 0 : local.exitcode_str == "" ? "" : local.exitcode_str == "null" ? null : tonumber(local.exitcode_str)
+  exitcode     = !local.create_command_exists ? 0 : local.exitcode_str == "" ? null : local.exitcode_str == "null" ? null : tonumber(local.exitcode_str)
 }
 
 locals {
