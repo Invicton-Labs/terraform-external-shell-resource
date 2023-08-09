@@ -95,7 +95,7 @@ output "stderr" {
 }
 output "exit_code" {
   description = "The exit status code of the shell command. If the `timeout` input variable was provided and the command timed out, this will be `null`."
-  value       = local.outputs.exit_code
+  value       = local.outputs.exit_code == null ? null : tonumber(local.outputs.exit_code)
 }
 output "null_command_windows" {
   description = "A command that does nothing on Windows systems. You can use this output as the value for the `command_windows` input if you don't want the module to do anything on Windows systems."
